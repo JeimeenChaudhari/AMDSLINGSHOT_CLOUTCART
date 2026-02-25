@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PricesAPI Test - Correct Format</title>
+</head>
+<body>
+    <h1>PricesAPI.io Test (Job-Based API)</h1>
+    <input type="text" id="productName" value="iPhone 17 Pro Max" style="width: 300px; padding: 5px;">
+    <button onclick="testAPI()">Test API</button>
+    <pre id="output" style="background: #f5f5f5; padding: 15px; border-radius: 5px;"></pre>
+
+    <script>
+        const API_KEY = 'pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt';
+        const API_ENDPOINT = 'https://api.pricesapi.io/api/v1';
+
+        function log(message) {
+            const output = document.getElementById('output');
+            output.textContent += message + '\n';
+            console.log(message);
+        }
+
+        async function testAPI() {
+            document.getElementById('output').textContent = '';
+            log('Testing PricesAPI.io (Job-Based)...\n');
+            
+            const productName = document.getElementById('productName').value;
+            const jobUrl = `${API_ENDPOINT}/jobs?api_key=${API_KEY}`;
+            
+            log('Product: ' + productName);
+            log('URL: ' + jobUrl);
+            log('Method: POST\n');
+            
+            try {
+                log('Sending request...');
+                const response = await fetch(jobUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        source: 'google_shopping',
+                        country: 'in',
+                        query: productName,
+                        parse: true
+                    })
+                });
+                
+                log('Status: ' + response.status + '\n');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log('❌ Error Response:\n' + errorText);
+                    return;
+                }
+                
+                const data = await response.json();
+                log('✅ Response received!\n');
+                log('Full Response:\n' + JSON.stringify(data, null, 2) + '\n');
+                
+                // Parse results
+                if (data && data.results && data.results.organic_results) {
+                    const results = data.results.organic_results;
+                    log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+                    log('Found ' + results.length + ' products:\n');
+                    
+                    results.slice(0, 5).forEach((result, i) => {
+                        log(`Product ${i + 1}:`);
+                        log('  Title: ' + (result.title || 'N/A'));
+                        log('  Price: ' + (result.price || result.extracted_price || 'N/A'));
+                        log('  Source: ' + (result.source || 'N/A'));
+                        log('  Link: ' + (result.link || 'N/A'));
+                        log('  Domain: ' + (result.link ? new URL(result.link).hostname : 'N/A'));
+                        log('');
+                    });
+                } else {
+                    log('❌ No organic_results found in response');
+                }
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                log('Stack: ' + error.stack);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -58,11 +58,13 @@ This is your complete browser extension for the AMD Slingshot Hackathon. Everyth
 5. ✅ Ready!
 
 ### Step 3: Test (3 minutes)
-1. Visit Amazon.com
-2. Search for "laptop"
+1. Visit Amazon.in or Flipkart.com
+2. Search for "laptop" or "smartphone"
 3. Click on any product
 4. Watch all 6 features activate!
 5. ✅ Working!
+
+**Works on 35+ websites including all major Indian e-commerce sites!**
 
 ---
 

@@ -183,6 +183,7 @@ function activateFocusMode() {
   const style = document.createElement('style');
   style.id = 'esa-focus-mode';
   style.textContent = `
+    /* Amazon sponsored items */
     [data-component-type*="sp-sponsored"],
     [data-component-type*="sponsored"],
     .s-sponsored-header,
@@ -191,8 +192,24 @@ function activateFocusMode() {
     .a-carousel-card[data-a-carousel-options*="sponsored"],
     div[data-cel-widget*="sp_"],
     .puis-sponsored-label-text,
-    span:has-text("Sponsored"),
-    div:has(> span.puis-label-popover-default):has-text("Sponsored") {
+    
+    /* Flipkart sponsored items */
+    [class*="X6gOzU"],
+    [class*="sponsored"],
+    
+    /* Generic sponsored patterns */
+    [class*="ad-"],
+    [class*="advertisement"],
+    [id*="ad-"],
+    [id*="advertisement"],
+    
+    /* Myntra ads */
+    [class*="adBanner"],
+    
+    /* Common ad patterns */
+    div:has(> span:contains("Sponsored")),
+    div:has(> span:contains("Ad")),
+    div:has(> div:contains("Sponsored")) {
       filter: blur(8px) !important;
       opacity: 0.3 !important;
       pointer-events: none !important;
@@ -200,22 +217,27 @@ function activateFocusMode() {
     }
     
     [data-component-type*="sp-sponsored"]:hover,
-    [data-component-type*="sponsored"]:hover {
+    [data-component-type*="sponsored"]:hover,
+    [class*="sponsored"]:hover {
       filter: blur(4px) !important;
       opacity: 0.6 !important;
     }
   `;
   document.head.appendChild(style);
   
-  // Also blur elements with "Sponsored" text
+  // Also blur elements with "Sponsored" or "Ad" text
   setTimeout(() => {
-    document.querySelectorAll('span, div').forEach(el => {
-      if (el.textContent.includes('Sponsored') && el.textContent.length < 50) {
-        const parent = el.closest('[data-component-type], .s-result-item, .a-carousel-card');
-        if (parent) {
+    const textPatterns = ['Sponsored', 'Ad', 'प्रायोजित', 'विज्ञापन'];
+    
+    document.querySelectorAll('span, div, p').forEach(el => {
+      const text = el.textContent.trim();
+      if (textPatterns.some(pattern => text === pattern || text.startsWith(pattern)) && text.length < 50) {
+        const parent = el.closest('[data-component-type], .s-result-item, .a-carousel-card, [class*="product"], [class*="item"]');
+        if (parent && !parent.hasAttribute('data-esa-blurred')) {
           parent.style.filter = 'blur(8px)';
           parent.style.opacity = '0.3';
           parent.style.pointerEvents = 'none';
+          parent.setAttribute('data-esa-blurred', 'true');
         }
       }
     });
@@ -279,7 +301,25 @@ function displayPriceHistory(history) {
     </div>
   `;
   
-  const priceElement = document.querySelector('.a-price, .price, [data-price]');
+  const priceSelectors = [
+    '.a-price',
+    '.price',
+    '[data-price]',
+    '._30jeq3',
+    '.pdp-price',
+    '.prod-sp',
+    '.actual-price',
+    '.selling-price',
+    '.product-price',
+    '.pdpPrice'
+  ];
+  
+  let priceElement = null;
+  for (const selector of priceSelectors) {
+    priceElement = document.querySelector(selector);
+    if (priceElement) break;
+  }
+  
   if (priceElement) {
     priceElement.parentElement.insertBefore(priceWidget, priceElement.nextSibling);
   }
@@ -288,43 +328,169 @@ function displayPriceHistory(history) {
 // Feature 4: Price Comparison
 function activateComparison() {
   const productName = extractProductName();
-  if (!productName) return;
-  
+  if (!productName) {
+    console.log('Could not extract product name for comparison');
+    return;
+  }
+
   const comparisonWidget = document.createElement('div');
   comparisonWidget.className = 'esa-comparison';
   comparisonWidget.innerHTML = `
-    <h3>🔍 Price Comparison</h3>
-    <div class="esa-comparison-loading">Searching other websites...</div>
+    <h3>🔍 Compare Prices</h3>
+    <p class="esa-comparison-subtitle">Finding "${productName.substring(0, 50)}${productName.length > 50 ? '...' : ''}" on other websites...</p>
+    <div class="esa-comparison-loading">Searching for best prices...</div>
     <div class="esa-comparison-results"></div>
+    <div class="esa-comparison-note">
+      <small>💡 Tip: We show only relevant websites where this product is likely available.</small>
+    </div>
   `;
-  
-  const insertPoint = document.querySelector('#productTitle, .product-title, h1');
+
+  const insertSelectors = [
+    '#productTitle',
+    '.product-title',
+    'h1',
+    '.B_NuCI',
+    'h1.pdp-title',
+    '.pdp-name',
+    '.prd-title',
+    '.product-heading',
+    '.product_name'
+  ];
+
+  let insertPoint = null;
+  for (const selector of insertSelectors) {
+    insertPoint = document.querySelector(selector);
+    if (insertPoint) break;
+  }
+
   if (insertPoint) {
     insertPoint.parentElement.insertBefore(comparisonWidget, insertPoint.nextSibling);
+  } else {
+    // Fallback: insert at top of body
+    document.body.insertBefore(comparisonWidget, document.body.firstChild);
   }
-  
-  // Simulate comparison (in production, use real API)
-  setTimeout(() => {
-    const currentPrice = extractCurrentPrice() || 99.99;
-    const comparisons = [
-      { site: 'Amazon', price: currentPrice, url: window.location.href, current: true },
-      { site: 'Walmart', price: currentPrice * 0.95, url: '#' },
-      { site: 'eBay', price: currentPrice * 1.05, url: '#' },
-      { site: 'Target', price: currentPrice * 0.92, url: '#' }
-    ].sort((a, b) => a.price - b.price);
-    
-    const resultsHTML = comparisons.map(comp => `
-      <div class="esa-comparison-item ${comp.current ? 'current' : ''}">
-        <span class="site">${comp.site}</span>
-        <span class="price">$${comp.price.toFixed(2)}</span>
-        ${!comp.current ? `<a href="${comp.url}" target="_blank" class="esa-btn-small">View</a>` : '<span class="badge">Current</span>'}
-      </div>
-    `).join('');
-    
-    comparisonWidget.querySelector('.esa-comparison-results').innerHTML = resultsHTML;
-    comparisonWidget.querySelector('.esa-comparison-loading').remove();
-  }, 2000);
+
+  // Use the PriceComparison utility
+  setTimeout(async () => {
+    try {
+      const priceComparison = new PriceComparison();
+      const currentPrice = extractCurrentPrice();
+      const comparisonData = await priceComparison.comparePrice(productName, currentPrice, window.location.hostname);
+
+      console.log('Price comparison data received:', comparisonData);
+      console.log('Available products:', comparisonData.availableProducts);
+
+      let resultsHTML = '';
+
+      // Show current site info with price
+      if (comparisonData.currentSite) {
+        const priceDisplay = comparisonData.currentSite.price 
+          ? `₹${comparisonData.currentSite.price.toLocaleString('en-IN')}` 
+          : 'Price not available';
+        
+        resultsHTML += `
+          <div class="esa-comparison-section">
+            <h4>📍 Current Site</h4>
+            <div class="esa-comparison-item current">
+              <span class="site-icon">${comparisonData.currentSite.icon}</span>
+              <div class="site-info">
+                <span class="site">${comparisonData.currentSite.site}</span>
+                <span class="price">${priceDisplay}</span>
+              </div>
+              <span class="badge">You're Here</span>
+            </div>
+          </div>
+        `;
+      }
+
+      // Show available products on other sites
+      if (comparisonData.availableProducts && comparisonData.availableProducts.length > 0) {
+        const hasRealPrices = comparisonData.availableProducts.some(p => p.price);
+        
+        resultsHTML += `
+          <div class="esa-comparison-section">
+            <h4>🛒 ${hasRealPrices ? 'Available On' : 'Check Prices On'}</h4>
+            <div class="esa-comparison-grid">
+              ${comparisonData.availableProducts.map(product => {
+                console.log('Rendering product:', product);
+                
+                const priceDisplay = product.price 
+                  ? `<span class="price">${product.currency || '₹'}${typeof product.price === 'number' ? product.price.toLocaleString('en-IN') : product.price}</span>`
+                  : `<span class="price-status">Click to check price</span>`;
+                
+                const savings = product.price && comparisonData.currentSite && comparisonData.currentSite.price
+                  ? comparisonData.currentSite.price - parseFloat(product.price)
+                  : 0;
+                
+                const savingsDisplay = savings > 0
+                  ? `<span class="savings">Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`
+                  : '';
+                
+                return `
+                  <a href="${product.url}" target="_blank" class="esa-comparison-item clickable ${product.price ? 'has-price' : ''}" title="${product.searchMode ? 'Search on' : 'View on'} ${product.site}">
+                    <span class="site-icon">${product.icon}</span>
+                    <div class="site-info">
+                      <span class="site">${product.site}</span>
+                      ${priceDisplay}
+                      ${savingsDisplay}
+                    </div>
+                    <span class="esa-btn-small">${product.searchMode ? 'Search' : 'View'} →</span>
+                  </a>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        resultsHTML += `
+          <div class="esa-comparison-section">
+            <p class="esa-info">No other relevant websites found for this product category.</p>
+          </div>
+        `;
+      }
+
+      // Add API status notice
+      if (comparisonData.apiUsed) {
+        resultsHTML += `
+          <div class="esa-comparison-api-notice success">
+            <small>✅ Real-time prices powered by PricesAPI.io</small>
+          </div>
+        `;
+      } else {
+        resultsHTML += `
+          <div class="esa-comparison-api-notice">
+            <small>ℹ️ Showing search links. Real-time prices available with API integration.</small>
+          </div>
+        `;
+      }
+
+      comparisonWidget.querySelector('.esa-comparison-results').innerHTML = resultsHTML;
+      comparisonWidget.querySelector('.esa-comparison-loading').remove();
+
+      // Add click tracking
+      comparisonWidget.querySelectorAll('.esa-comparison-item.clickable').forEach(item => {
+        item.addEventListener('click', (e) => {
+          const siteName = e.currentTarget.querySelector('.site').textContent;
+          console.log('User clicked to compare on:', siteName);
+          
+          // Track comparison clicks
+          chrome.storage.local.get(['comparisonClicks'], (result) => {
+            const clicks = result.comparisonClicks || 0;
+            chrome.storage.local.set({ comparisonClicks: clicks + 1 });
+          });
+        });
+      });
+
+    } catch (error) {
+      console.error('Error in price comparison:', error);
+      comparisonWidget.querySelector('.esa-comparison-results').innerHTML = `
+        <div class="esa-error">Unable to load comparison sites. Please try again.</div>
+      `;
+      comparisonWidget.querySelector('.esa-comparison-loading').remove();
+    }
+  }, 1000);
 }
+
 
 // Feature 5: AI Recommendation
 function activateRecommendation() {
@@ -340,7 +506,24 @@ function activateRecommendation() {
     <div class="esa-rec-loading">Analyzing product...</div>
   `;
   
-  const insertPoint = document.querySelector('#productTitle, .product-title, h1');
+  const insertSelectors = [
+    '#productTitle',
+    '.product-title',
+    'h1',
+    '.B_NuCI',
+    'h1.pdp-title',
+    '.pdp-name',
+    '.prd-title',
+    '.product-heading',
+    '.product_name'
+  ];
+  
+  let insertPoint = null;
+  for (const selector of insertSelectors) {
+    insertPoint = document.querySelector(selector);
+    if (insertPoint) break;
+  }
+  
   if (insertPoint) {
     insertPoint.parentElement.insertBefore(recommendationWidget, insertPoint.nextSibling);
   }
@@ -393,7 +576,23 @@ function activateRecommendation() {
 
 // Feature 6: Review Checker
 function activateReviewChecker() {
-  const reviews = document.querySelectorAll('[data-hook="review"], .review, .a-section.review');
+  const reviewSelectors = [
+    '[data-hook="review"]',             // Amazon
+    '.review',                          // Generic
+    '.a-section.review',                // Amazon
+    '._27M-vq',                         // Flipkart
+    '.user-review',                     // Myntra
+    '.prod-review',                     // Ajio
+    '.review-item',                     // Generic
+    '[class*="review"]',                // Generic
+    '.customer-review'                  // Various
+  ];
+  
+  let reviews = [];
+  for (const selector of reviewSelectors) {
+    reviews = document.querySelectorAll(selector);
+    if (reviews.length > 0) break;
+  }
   
   if (reviews.length === 0) return;
   
@@ -404,9 +603,25 @@ function activateReviewChecker() {
     <div class="esa-checker-loading">Analyzing ${reviews.length} reviews...</div>
   `;
   
-  const reviewSection = document.querySelector('#reviewsMedley, #reviews, .reviews-section');
+  const reviewSectionSelectors = [
+    '#reviewsMedley',
+    '#reviews',
+    '.reviews-section',
+    '[data-hook="reviews-medley"]',
+    '.review-section',
+    '[class*="review"]'
+  ];
+  
+  let reviewSection = null;
+  for (const selector of reviewSectionSelectors) {
+    reviewSection = document.querySelector(selector);
+    if (reviewSection) break;
+  }
+  
   if (reviewSection) {
     reviewSection.insertBefore(checkerWidget, reviewSection.firstChild);
+  } else if (reviews.length > 0) {
+    reviews[0].parentElement.insertBefore(checkerWidget, reviews[0]);
   }
   
   // Analyze reviews
@@ -488,37 +703,139 @@ function analyzeReviews(reviews) {
 // Helper functions
 function extractProductId() {
   const url = window.location.href;
-  const match = url.match(/\/dp\/([A-Z0-9]{10})|\/product\/([A-Z0-9]+)/);
-  return match ? (match[1] || match[2]) : null;
+  
+  // Amazon pattern
+  let match = url.match(/\/dp\/([A-Z0-9]{10})/);
+  if (match) return match[1];
+  
+  // Flipkart pattern
+  match = url.match(/\/p\/([a-zA-Z0-9]+)/);
+  if (match) return match[1];
+  
+  // Generic product ID patterns
+  match = url.match(/\/product\/([A-Z0-9]+)/);
+  if (match) return match[1];
+  
+  match = url.match(/pid=([A-Z0-9]+)/);
+  if (match) return match[1];
+  
+  match = url.match(/product_id=([A-Z0-9]+)/);
+  if (match) return match[1];
+  
+  // Use URL as fallback ID
+  return btoa(url.split('?')[0]).substring(0, 20);
 }
 
 function extractProductName() {
-  const titleEl = document.querySelector('#productTitle, .product-title, h1[itemprop="name"]');
-  return titleEl ? titleEl.textContent.trim() : null;
+  const selectors = [
+    '#productTitle',                    // Amazon
+    '.product-title',                   // Generic
+    'h1[itemprop="name"]',             // Schema.org
+    '.B_NuCI',                         // Flipkart
+    'h1.pdp-title',                    // Myntra
+    '.pdp-name',                       // Ajio
+    '.product-name',                   // Generic
+    'h1[class*="title"]',              // Generic title
+    'h1[class*="product"]',            // Generic product
+    '.prd-title',                      // Tata CLiQ
+    '[data-test="product-title"]',    // Various sites
+    '.product-heading',                // Nykaa
+    '.product_name'                    // Meesho
+  ];
+  
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el && el.textContent.trim()) {
+      return el.textContent.trim();
+    }
+  }
+  return null;
 }
 
 function extractCurrentPrice() {
-  const priceEl = document.querySelector('.a-price-whole, .a-price .a-offscreen, [data-price], .price');
-  if (!priceEl) return null;
+  const selectors = [
+    '.a-price-whole',                  // Amazon
+    '.a-price .a-offscreen',           // Amazon
+    '[data-price]',                    // Generic
+    '.price',                          // Generic
+    '._30jeq3',                        // Flipkart
+    '.pdp-price',                      // Myntra
+    '.prod-sp',                        // Ajio
+    '.actual-price',                   // Tata CLiQ
+    '[class*="price"]',                // Generic
+    '.selling-price',                  // Nykaa
+    '.product-price',                  // Meesho
+    '.pdpPrice',                       // Snapdeal
+    '[itemprop="price"]'               // Schema.org
+  ];
   
-  const priceText = priceEl.textContent.replace(/[^0-9.]/g, '');
-  return parseFloat(priceText) || null;
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const priceText = el.textContent || el.getAttribute('content') || '';
+      const cleanPrice = priceText.replace(/[^0-9.]/g, '');
+      const price = parseFloat(cleanPrice);
+      if (price && price > 0) {
+        return price;
+      }
+    }
+  }
+  return null;
 }
 
 function extractRating() {
-  const ratingEl = document.querySelector('[data-hook="rating-out-of-text"], .a-icon-star, [itemprop="ratingValue"]');
-  if (!ratingEl) return 4.0;
+  const selectors = [
+    '[data-hook="rating-out-of-text"]', // Amazon
+    '.a-icon-star',                     // Amazon
+    '[itemprop="ratingValue"]',         // Schema.org
+    '._3LWZlK',                         // Flipkart
+    '.ratings-rating',                  // Myntra
+    '.prod-rating',                     // Ajio
+    '.ratingCount',                     // Tata CLiQ
+    '[class*="rating"]',                // Generic
+    '.rating-value',                    // Nykaa
+    '.product-rating'                   // Meesho
+  ];
   
-  const ratingText = ratingEl.textContent.match(/[\d.]+/);
-  return ratingText ? parseFloat(ratingText[0]) : 4.0;
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const ratingText = el.textContent.match(/[\d.]+/);
+      if (ratingText) {
+        const rating = parseFloat(ratingText[0]);
+        if (rating > 0 && rating <= 5) {
+          return rating;
+        }
+      }
+    }
+  }
+  return 4.0;
 }
 
 function extractReviewCount() {
-  const reviewEl = document.querySelector('#acrCustomerReviewText, [data-hook="total-review-count"]');
-  if (!reviewEl) return 50;
+  const selectors = [
+    '#acrCustomerReviewText',           // Amazon
+    '[data-hook="total-review-count"]', // Amazon
+    '._2_R_DZ',                         // Flipkart
+    '.ratings-count',                   // Myntra
+    '.prod-reviews',                    // Ajio
+    '.reviewCount',                     // Tata CLiQ
+    '[class*="review-count"]',          // Generic
+    '.rating-count',                    // Nykaa
+    '.product-reviews-count'            // Meesho
+  ];
   
-  const countText = reviewEl.textContent.replace(/[^0-9]/g, '');
-  return parseInt(countText) || 50;
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const countText = el.textContent.replace(/[^0-9]/g, '');
+      const count = parseInt(countText);
+      if (count && count > 0) {
+        return count;
+      }
+    }
+  }
+  return 50;
 }
 
 function setupListeners() {

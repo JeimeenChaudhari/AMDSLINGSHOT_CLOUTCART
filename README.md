@@ -20,11 +20,14 @@ An AI-powered browser extension for AMD Slingshot Hackathon that enhances online
 - Alerts when product is at best price
 - 90-day price history storage
 
-### 4. 🔍 Multi-Website Price Comparison
-- Compares prices across Amazon, Walmart, eBay, Target, Best Buy
-- Shows which website has the lowest price
-- One-click redirect to better deals
-- Calculates potential savings
+### 4. 🔍 Multi-Website Price Comparison (25+ Sites!)
+- **US Sites**: Amazon, Walmart, eBay, Target, Best Buy, Newegg, AliExpress, Etsy
+- **Indian Sites**: Flipkart, Amazon India, Myntra, Ajio, Snapdeal, Meesho, Tata CLiQ, Nykaa, FirstCry, Pepperfry, Croma, Reliance Digital
+- **International**: Amazon UK, Amazon DE, Amazon CA, Argos
+- One-click search on any website
+- Organized by region for easy navigation
+- Real product search URLs (no fake links!)
+- Works on all supported e-commerce sites
 
 ### 5. 🤖 AI Buy/Not Buy Recommendations
 - Analyzes product ratings, reviews, and price trends
@@ -122,6 +125,25 @@ The AI adjusts recommendations based on your emotional state:
 - Identifies price drops and increases
 - Shows best time to buy
 
+### Multi-Site Price Comparison
+
+The extension helps you find the same product on 25+ shopping websites:
+
+**How it works:**
+1. Detects the product you're viewing
+2. Generates search links for all supported sites
+3. Organizes sites by region (US, India, International)
+4. Click any site to search for the product there
+5. Compare prices manually across all sites
+
+**Supported Sites:**
+- **US**: Amazon, Walmart, eBay, Target, Best Buy, Newegg, AliExpress, Etsy
+- **India**: Flipkart, Amazon India, Myntra, Ajio, Snapdeal, Meesho, Tata CLiQ, Nykaa, FirstCry, Pepperfry, Croma, Reliance Digital
+- **International**: Amazon UK, Amazon DE, Amazon CA, Argos
+
+**Future Enhancement:**
+For automatic price fetching with real-time data, see `PRICE_API_INTEGRATION.md` for API integration options.
+
 ### Review Analysis
 
 Detects fake reviews by checking:
@@ -149,14 +171,58 @@ Detects fake reviews by checking:
 
 ## 📊 Supported Websites
 
-Currently supports:
-- ✅ Amazon (US, India)
-- ✅ Flipkart
-- ✅ eBay
-- ✅ Walmart
-- ✅ Target
+### International
+- ✅ Amazon.com
+- ✅ eBay.com
+- ✅ Walmart.com
+- ✅ Target.com
 
-More websites coming soon!
+### India - General E-commerce
+- ✅ Amazon.in
+- ✅ Flipkart.com
+- ✅ Meesho.com
+- ✅ Snapdeal.com
+- ✅ ShopClues.com
+- ✅ Paytm Mall
+
+### India - Fashion & Lifestyle
+- ✅ Myntra.com
+- ✅ Ajio.com
+- ✅ Tata CLiQ
+- ✅ Koovs.com
+- ✅ Limeroad.com
+- ✅ Bewakoof.com
+
+### India - Beauty & Personal Care
+- ✅ Nykaa.com
+- ✅ Purplle.com
+- ✅ Sugar Cosmetics
+
+### India - Electronics & Gadgets
+- ✅ Croma.com
+- ✅ Reliance Digital
+- ✅ Vijay Sales
+
+### India - Grocery & Quick Commerce
+- ✅ BigBasket.com
+- ✅ Blinkit (Grofers)
+- ✅ Zepto
+- ✅ JioMart
+- ✅ Spencers Retail
+
+### India - Baby & Family
+- ✅ FirstCry.com
+- ✅ Hopscotch.in
+
+### India - Furniture & Home
+- ✅ Pepperfry.com
+- ✅ Urban Ladder
+- ✅ IKEA India
+
+### India - B2B
+- ✅ IndiaMART.com
+
+**Total: 35+ websites supported!**
 
 ## 🎯 Hackathon Theme: AI in Consumer
 

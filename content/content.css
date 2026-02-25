@@ -394,3 +394,197 @@
 #esa-panel {
   animation: slideIn 0.5s ease-out;
 }
+
+/* Enhanced Comparison Widget Styles */
+.esa-comparison-subtitle {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #555;
+  font-weight: normal;
+}
+
+.esa-comparison-section {
+  margin-bottom: 16px;
+}
+
+.esa-comparison-section h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.esa-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.esa-comparison-item.clickable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-height: 80px;
+}
+
+.esa-comparison-item.clickable:hover {
+  border-color: #48bb78;
+  background: #f0fff4;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.2);
+}
+
+.esa-comparison-item .site-icon {
+  font-size: 24px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.esa-comparison-item .site-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+}
+
+.esa-comparison-item.current .site-info {
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.esa-comparison-item .site-info .site {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: #333;
+}
+
+.esa-comparison-item .site-info .price {
+  font-size: 14px;
+  font-weight: 700;
+  color: #48bb78;
+}
+
+.esa-comparison-item .site-info .price-status {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.esa-comparison-item .site-info .savings {
+  font-size: 10px;
+  color: #48bb78;
+  font-weight: 600;
+  background: #f0fff4;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-top: 2px;
+}
+
+.esa-comparison-item.has-price {
+  border-color: #48bb78;
+  background: #f0fff4;
+}
+
+.esa-comparison-item.has-price:hover {
+  border-color: #38a169;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.esa-comparison-item.clickable .site {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.esa-comparison-item.clickable .esa-btn-small {
+  font-size: 11px;
+  padding: 3px 10px;
+  margin-top: 4px;
+}
+
+.esa-comparison-note {
+  margin-top: 12px;
+  padding: 10px;
+  background: #e6fffa;
+  border-radius: 6px;
+  border-left: 3px solid #48bb78;
+}
+
+.esa-comparison-note small {
+  font-size: 11px;
+  color: #2d3748;
+  line-height: 1.4;
+}
+
+.esa-comparison-api-notice {
+  margin-top: 12px;
+  padding: 10px;
+  background: #fff3cd;
+  border-radius: 6px;
+  border-left: 3px solid #ffc107;
+}
+
+.esa-comparison-api-notice.success {
+  background: #f0fff4;
+  border-left: 3px solid #48bb78;
+}
+
+.esa-comparison-api-notice small {
+  font-size: 11px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+.esa-comparison-api-notice.success small {
+  color: #2d5f3f;
+}
+
+.esa-info {
+  text-align: center;
+  padding: 16px;
+  color: #666;
+  font-size: 13px;
+}
+
+.esa-error {
+  text-align: center;
+  padding: 20px;
+  color: #f56565;
+  font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .esa-comparison-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+  
+  .esa-comparison-item.clickable {
+    min-height: 70px;
+    padding: 10px 6px;
+  }
+  
+  .esa-comparison-item .site-icon {
+    font-size: 20px;
+  }
+  
+  .esa-comparison-item.clickable .site {
+    font-size: 11px;
+  }
+}
