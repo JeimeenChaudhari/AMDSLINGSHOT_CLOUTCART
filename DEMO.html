@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Extension Demo - Test Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 20px;
+    }
+
+    .demo-section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 2px solid #eee;
+      border-radius: 8px;
+    }
+
+    .demo-section h2 {
+      color: #333;
+      margin-bottom: 15px;
+    }
+
+    .product-card {
+      display: flex;
+      gap: 20px;
+      padding: 20px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      margin: 15px 0;
+    }
+
+    .product-image {
+      width: 200px;
+      height: 200px;
+      background: #ddd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+    }
+
+    .product-info {
+      flex: 1;
+    }
+
+    .product-title {
+      font-size: 20px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    .price {
+      font-size: 24px;
+      color: #B12704;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    .rating {
+      color: #FFA41C;
+      margin: 10px 0;
+    }
+
+    .sponsored {
+      background: #FFF8DC;
+      border: 1px solid #FFD700;
+      padding: 5px 10px;
+      display: inline-block;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .reviews {
+      margin-top: 30px;
+    }
+
+    .review {
+      padding: 15px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .verified {
+      color: #067D62;
+      font-size: 12px;
+    }
+
+    .instructions {
+      background: #e7f3ff;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+      border-left: 4px solid #667eea;
+    }
+
+    .instructions h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .instructions ol {
+      margin-left: 20px;
+    }
+
+    .instructions li {
+      margin: 8px 0;
+    }
+
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+
+    button:hover {
+      background: #5568d3;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛍️ Emotion-Adaptive Shopping Assistant - Demo Page</h1>
+    
+    <div class="instructions">
+      <h3>📋 How to Test the Extension</h3>
+      <ol>
+        <li>Make sure the extension is installed and enabled</li>
+        <li>Click the extension icon and enable features</li>
+        <li>Refresh this page</li>
+        <li>Look for the floating panel in the bottom-right corner</li>
+        <li>Observe how sponsored items get blurred (Focus Mode)</li>
+        <li>Check the price history, comparison, and AI recommendations</li>
+        <li>See fake review detection in action</li>
+      </ol>
+      <p><strong>Note:</strong> For full functionality, visit actual shopping sites like Amazon.com</p>
+    </div>
+
+    <div class="demo-section">
+      <h2>Featured Products</h2>
+      
+      <!-- Sponsored Product (should be blurred) -->
+      <div class="product-card" data-component-type="sp-sponsored">
+        <div class="product-image">📱</div>
+        <div class="product-info">
+          <span class="sponsored">Sponsored</span>
+          <div class="product-title">Premium Smartphone XYZ - Latest Model</div>
+          <div class="rating">⭐⭐⭐⭐⭐ 4.8 out of 5 (2,543 reviews)</div>
+          <div class="price">$899.99</div>
+          <button>Add to Cart</button>
+          <button>Buy Now</button>
+        </div>
+      </div>
+
+      <!-- Regular Product -->
+      <div class="product-card">
+        <div class="product-image">💻</div>
+        <div class="product-info">
+          <div class="product-title" id="productTitle">Professional Laptop Pro 15" - High Performance</div>
+          <div class="rating">⭐⭐⭐⭐☆ 4.5 out of 5 (1,234 reviews)</div>
+          <div class="price" data-price="1299.99">
+            <span class="a-price-whole">$1,299.99</span>
+          </div>
+          <button>Add to Cart</button>
+          <button>Buy Now</button>
+        </div>
+      </div>
+
+      <!-- Another Sponsored Product -->
+      <div class="product-card" data-component-type="sponsored">
+        <div class="product-image">🎧</div>
+        <div class="product-info">
+          <span class="sponsored">Sponsored</span>
+          <div class="product-title">Wireless Headphones Ultra - Noise Cancelling</div>
+          <div class="rating">⭐⭐⭐⭐⭐ 4.9 out of 5 (5,678 reviews)</div>
+          <div class="price">$299.99</div>
+          <button>Add to Cart</button>
+          <button>Buy Now</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-section reviews" id="reviews">
+      <h2>Customer Reviews</h2>
+      
+      <div class="review" data-hook="review">
+        <div class="review-header">
+          <div>
+            <strong>John Smith</strong>
+            <div class="rating">⭐⭐⭐⭐⭐</div>
+          </div>
+          <span class="verified">✓ Verified Purchase</span>
+        </div>
+        <p>Great product! Works exactly as described. The build quality is excellent and it arrived on time. Highly recommend for anyone looking for a reliable device.</p>
+      </div>
+
+      <div class="review" data-hook="review">
+        <div class="review-header">
+          <div>
+            <strong>Sarah Johnson</strong>
+            <div class="rating">⭐⭐⭐⭐⭐</div>
+          </div>
+          <span class="verified">✓ Verified Purchase</span>
+        </div>
+        <p>AMAZING!!! BEST PRODUCT EVER!!! PERFECT!!! BUY NOW!!! You won't regret it!!!</p>
+      </div>
+
+      <div class="review" data-hook="review">
+        <div class="review-header">
+          <div>
+            <strong>Mike Wilson</strong>
+            <div class="rating">⭐⭐⭐⭐☆</div>
+          </div>
+          <span class="verified">✓ Verified Purchase</span>
+        </div>
+        <p>Good value for money. Had some minor issues initially but customer service was helpful. Overall satisfied with the purchase.</p>
+      </div>
+
+      <div class="review" data-hook="review">
+        <div class="review-header">
+          <div>
+            <strong>Anonymous</strong>
+            <div class="rating">⭐⭐⭐⭐⭐</div>
+          </div>
+        </div>
+        <p>Best!</p>
+      </div>
+
+      <div class="review" data-hook="review">
+        <div class="review-header">
+          <div>
+            <strong>Emily Davis</strong>
+            <div class="rating">⭐⭐⭐⭐⭐</div>
+          </div>
+          <span class="verified">✓ Verified Purchase</span>
+        </div>
+        <p>I've been using this for three months now and it has completely exceeded my expectations. The features are intuitive, the performance is outstanding, and the design is sleek. Worth every penny!</p>
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2>🎯 Testing Checklist</h2>
+      <ul style="list-style: none; padding: 20px;">
+        <li>✅ Floating panel appears in bottom-right</li>
+        <li>✅ Sponsored items are blurred (Focus Mode)</li>
+        <li>✅ Price history widget shows near price</li>
+        <li>✅ Price comparison table displays</li>
+        <li>✅ AI recommendation appears</li>
+        <li>✅ Review analysis shows authenticity score</li>
+        <li>✅ Suspicious reviews are flagged</li>
+        <li>✅ Emotion detection works (webcam or keyboard mode)</li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <h2>🚀 Next Steps</h2>
+      <p>For the full experience, visit these websites:</p>
+      <ul style="margin: 15px 0 15px 30px;">
+        <li><a href="https://www.amazon.com" target="_blank">Amazon.com</a></li>
+        <li><a href="https://www.walmart.com" target="_blank">Walmart.com</a></li>
+        <li><a href="https://www.ebay.com" target="_blank">eBay.com</a></li>
+        <li><a href="https://www.target.com" target="_blank">Target.com</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Simulate product data for extension
+    console.log('Demo page loaded - Extension should inject features');
+    console.log('Product ID: DEMO-LAPTOP-001');
+    console.log('Current Price: $1,299.99');
+  </script>
+</body>
+</html>

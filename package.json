@@ -1,0 +1,44 @@
+{
+  "name": "emotion-adaptive-shopping-assistant",
+  "version": "1.0.0",
+  "description": "AI-powered browser extension for smart shopping with emotion detection",
+  "main": "background/background.js",
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0",
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,json,md}\"",
+    "build": "echo \"Building extension...\" && npm run lint",
+    "package": "zip -r emotion-shopping-assistant.zip . -x '*.git*' 'node_modules/*' '*.pdf' 'package-lock.json'"
+  },
+  "keywords": [
+    "chrome-extension",
+    "shopping",
+    "emotion-detection",
+    "ai",
+    "price-comparison",
+    "fake-reviews",
+    "consumer-tech",
+    "amd-slingshot",
+    "hackathon"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/emotion-shopping-assistant"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/emotion-shopping-assistant/issues"
+  },
+  "homepage": "https://github.com/yourusername/emotion-shopping-assistant#readme",
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browser": {
+    "chrome": ">=88.0.0"
+  }
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emotion Shopping Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🛍️ Smart Shopping Assistant</h1>
+      <p class="tagline">AI-Powered Shopping with Emotion Detection</p>
+    </header>
+
+    <section class="emotion-section">
+      <h2>😊 Emotion Detection</h2>
+      <div class="toggle-group">
+        <label class="switch">
+          <input type="checkbox" id="emotionToggle">
+          <span class="slider"></span>
+        </label>
+        <span id="emotionStatus">Disabled</span>
+      </div>
+      <div id="emotionDisplay" class="emotion-display hidden">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="emotionCanvas" style="display:none;"></canvas>
+        <div class="emotion-result">
+          <span class="emotion-icon">😐</span>
+          <span class="emotion-text">Neutral</span>
+          <div class="emotion-confidence">Confidence: 0%</div>
+        </div>
+      </div>
+      <div class="keyboard-mode">
+        <label>
+          <input type="checkbox" id="keyboardMode">
+          Use Keyboard/Cursor Mode (No Webcam)
+        </label>
+      </div>
+    </section>
+
+    <section class="features-section">
+      <h2>⚙️ Features</h2>
+      
+      <div class="feature-item">
+        <label class="switch">
+          <input type="checkbox" id="focusModeToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="feature-info">
+          <strong>Focus Mode</strong>
+          <p>Blur sponsored items</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <label class="switch">
+          <input type="checkbox" id="priceHistoryToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="feature-info">
+          <strong>Price History</strong>
+          <p>Track price changes</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <label class="switch">
+          <input type="checkbox" id="comparisonToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="feature-info">
+          <strong>Price Comparison</strong>
+          <p>Compare across websites</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <label class="switch">
+          <input type="checkbox" id="recommendationToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="feature-info">
+          <strong>AI Recommendations</strong>
+          <p>Buy or not suggestions</p>
+        </div>
+      </div>
+
+      <div class="feature-item">
+        <label class="switch">
+          <input type="checkbox" id="reviewCheckerToggle" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="feature-info">
+          <strong>Review Checker</strong>
+          <p>Detect fake reviews</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-section">
+      <h2>📊 Session Stats</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="moneySaved">$0</div>
+          <div class="stat-label">Money Saved</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value" id="productsAnalyzed">0</div>
+          <div class="stat-label">Products Analyzed</div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <button id="resetBtn" class="btn-secondary">Reset Settings</button>
+    </footer>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
