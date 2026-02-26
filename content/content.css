@@ -291,6 +291,25 @@
   font-size: 11px;
 }
 
+.esa-rec-warnings {
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 6px;
+}
+
+.esa-warning {
+  font-size: 12px;
+  color: #856404;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.esa-warning:last-child {
+  margin-bottom: 0;
+}
+
 /* Review Checker Widget */
 .esa-review-checker {
   background: #fef5e7;

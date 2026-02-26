@@ -126,13 +126,13 @@ class PriceComparison {
       const searchUrl = `${this.apiConfig.endpoint}/jobs?api_key=${this.apiConfig.apiKey}`;
       
       console.log('PricesAPI: Searching for:', productName);
-      console.log('PricesAPI: URL:', searchUrl);
       
       // PricesAPI requires POST request with job parameters
       const response = await fetch(searchUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           source: 'google_shopping',
@@ -140,12 +140,18 @@ class PriceComparison {
           query: productName,
           parse: true
         })
+      }).catch(err => {
+        console.warn('PricesAPI: Network error, using fallback search links:', err.message);
+        return null;
       });
       
+      if (!response) {
+        return null;
+      }
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('PricesAPI: Request failed:', response.status, errorText);
-        throw new Error(`API request failed: ${response.status}`);
+        console.warn('PricesAPI: Request failed with status', response.status, '- using fallback search links');
+        return null;
       }
       
       const data = await response.json();
@@ -276,8 +282,8 @@ class PriceComparison {
       }
       
     } catch (error) {
-      console.error('Error fetching from PricesAPI:', error);
-      // Return empty results, will fallback to search URLs
+      console.warn('PricesAPI error, using fallback search links:', error.message);
+      // Return null to trigger fallback to search URLs
       return null;
     }
 

@@ -3,6 +3,7 @@ let settings = {};
 let currentEmotion = 'Neutral';
 let mouseActivity = { clicks: 0, movements: 0, lastActivity: Date.now() };
 let keyboardActivity = { keyPresses: 0, lastActivity: Date.now() };
+let activityData = { clicks: 0, movements: 0, timeSpent: 0, scrolls: 0, startTime: Date.now() };
 
 // Initialize
 init();
@@ -85,19 +86,29 @@ function startKeyboardTracking() {
   document.addEventListener('mousemove', () => {
     mouseActivity.movements++;
     mouseActivity.lastActivity = Date.now();
+    activityData.movements++;
+    activityData.timeSpent = Date.now() - activityData.startTime;
     analyzeActivity();
   });
 
   document.addEventListener('click', () => {
     mouseActivity.clicks++;
     mouseActivity.lastActivity = Date.now();
+    activityData.clicks++;
+    activityData.timeSpent = Date.now() - activityData.startTime;
     analyzeActivity();
   });
 
   document.addEventListener('keydown', () => {
     keyboardActivity.keyPresses++;
     keyboardActivity.lastActivity = Date.now();
+    activityData.timeSpent = Date.now() - activityData.startTime;
     analyzeActivity();
+  });
+
+  document.addEventListener('scroll', () => {
+    activityData.scrolls++;
+    activityData.timeSpent = Date.now() - activityData.startTime;
   });
 
   setInterval(analyzeActivity, 3000);
@@ -542,19 +553,21 @@ function activateComparison() {
 
 
 // Feature 5: AI Recommendation
-function activateRecommendation() {
+async function activateRecommendation() {
   const currentPrice = extractCurrentPrice();
   const productName = extractProductName();
-  
+  const rating = extractRating();
+  const reviewCount = extractReviewCount();
+
   if (!currentPrice || !productName) return;
-  
+
   const recommendationWidget = document.createElement('div');
   recommendationWidget.className = 'esa-recommendation';
   recommendationWidget.innerHTML = `
     <h3>🤖 AI Recommendation</h3>
-    <div class="esa-rec-loading">Analyzing product...</div>
+    <div class="esa-rec-loading">Analyzing product with AI...</div>
   `;
-  
+
   const insertSelectors = [
     '#productTitle',
     '.product-title',
@@ -566,62 +579,144 @@ function activateRecommendation() {
     '.product-heading',
     '.product_name'
   ];
-  
+
   let insertPoint = null;
   for (const selector of insertSelectors) {
     insertPoint = document.querySelector(selector);
     if (insertPoint) break;
   }
-  
+
   if (insertPoint) {
     insertPoint.parentElement.insertBefore(recommendationWidget, insertPoint.nextSibling);
   }
-  
-  // Simulate AI analysis
-  setTimeout(() => {
-    const rating = extractRating();
-    const reviewCount = extractReviewCount();
-    
-    let recommendation = 'BUY';
-    let reason = 'Good price and ratings';
-    let confidence = 85;
-    
-    // Decision logic based on emotion and data
-    if (currentEmotion === 'Anxious' || currentEmotion === 'Fearful') {
-      recommendation = 'WAIT';
-      reason = 'You seem uncertain. Take time to research more.';
-      confidence = 70;
-    } else if (rating < 3.5) {
-      recommendation = 'AVOID';
-      reason = 'Low product ratings';
-      confidence = 90;
-    } else if (reviewCount < 10) {
-      recommendation = 'WAIT';
-      reason = 'Not enough reviews yet';
-      confidence = 75;
-    } else if (rating >= 4.5 && reviewCount > 100) {
-      recommendation = 'BUY';
-      reason = 'Excellent ratings and many positive reviews';
-      confidence = 95;
-    }
-    
-    const recClass = recommendation === 'BUY' ? 'buy' : recommendation === 'WAIT' ? 'wait' : 'avoid';
-    
-    recommendationWidget.innerHTML = `
-      <h3>🤖 AI Recommendation</h3>
-      <div class="esa-rec-result ${recClass}">
-        <div class="esa-rec-badge">${recommendation}</div>
-        <div class="esa-rec-reason">${reason}</div>
-        <div class="esa-rec-confidence">Confidence: ${confidence}%</div>
-        <div class="esa-rec-factors">
-          <div>⭐ Rating: ${rating}/5</div>
-          <div>💬 Reviews: ${reviewCount}</div>
-          <div>😊 Your mood: ${currentEmotion}</div>
+
+  // Perform comprehensive AI analysis
+  setTimeout(async () => {
+    try {
+      // Initialize AI engine
+      const aiEngine = new AIRecommendationEngine();
+
+      // Get price history from storage
+      const productId = extractProductId();
+      let historicalPrices = [];
+      
+      if (productId) {
+        const storageData = await new Promise((resolve) => {
+          chrome.storage.local.get(['priceHistory'], (data) => {
+            resolve(data);
+          });
+        });
+        
+        const priceHistory = storageData.priceHistory || {};
+        if (priceHistory[productId] && priceHistory[productId].length > 0) {
+          historicalPrices = priceHistory[productId].map(p => p.price);
+        }
+      }
+
+      // Gather product data
+      const productData = {
+        rating: rating || 0,
+        reviewCount: reviewCount || 0,
+        currentPrice: currentPrice,
+        historicalPrice: historicalPrices,
+        productName: productName
+      };
+
+      // Gather behavioral data
+      const behaviorData = {
+        clicks: activityData.clicks || 0,
+        movements: activityData.movements || 0,
+        timeSpent: activityData.timeSpent || 0,
+        scrolls: activityData.scrolls || 0
+      };
+
+      // Extract reviews from page
+      const reviewElements = extractReviews();
+
+      // Generate AI recommendation
+      const result = await aiEngine.generateRecommendation(
+        productData,
+        currentEmotion,
+        behaviorData,
+        reviewElements
+      );
+
+      // Display result
+      const recClass = result.decision === 'BUY' ? 'buy' :
+                       result.decision === 'WAIT' ? 'wait' : 'avoid';
+
+      let warningsHTML = '';
+      if (result.warnings.length > 0) {
+        warningsHTML = `
+          <div class="esa-rec-warnings">
+            ${result.warnings.map(w => `<div class="esa-warning">${w}</div>`).join('')}
+          </div>
+        `;
+      }
+
+      recommendationWidget.innerHTML = `
+        <h3>🤖 AI Recommendation</h3>
+        <div class="esa-rec-result ${recClass}">
+          <div class="esa-rec-badge">${result.decision}</div>
+          <div class="esa-rec-reason">${result.reasoning}</div>
+          <div class="esa-rec-confidence">Confidence: ${result.confidence}%</div>
+          ${warningsHTML}
+          <div class="esa-rec-factors">
+            <div>⭐ Rating: ${rating}/5 (${reviewCount} reviews)</div>
+            <div>🔍 Authentic: ${result.reviewAnalysis.authenticReviews} reviews</div>
+            <div>⚠️ Fake Risk: ${Math.round(result.reviewAnalysis.fakeReviewPercentage)}%</div>
+            <div>😊 Your mood: ${currentEmotion}</div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+
+      // Store recommendation for stats
+      chrome.storage.local.get(['recommendations'], (data) => {
+        const recs = data.recommendations || [];
+        recs.push({
+          product: productName,
+          decision: result.decision,
+          confidence: result.confidence,
+          timestamp: Date.now()
+        });
+        chrome.storage.local.set({ recommendations: recs });
+      });
+
+    } catch (error) {
+      console.error('AI Recommendation error:', error);
+      recommendationWidget.innerHTML = `
+        <h3>🤖 AI Recommendation</h3>
+        <div class="esa-rec-result wait">
+          <div class="esa-rec-badge">WAIT</div>
+          <div class="esa-rec-reason">Unable to analyze product completely. Please review manually.</div>
+          <div class="esa-rec-confidence">Confidence: 50%</div>
+        </div>
+      `;
+    }
   }, 1500);
 }
+
+// Helper function to extract reviews from page
+function extractReviews() {
+  const reviewSelectors = [
+    '[data-hook="review"]',
+    '.review',
+    '.review-item',
+    '[data-testid="review"]',
+    '.customer-review',
+    '.a-section.review'
+  ];
+
+  let reviews = [];
+  for (const selector of reviewSelectors) {
+    reviews = Array.from(document.querySelectorAll(selector));
+    if (reviews.length > 0) break;
+  }
+
+  return reviews.slice(0, 50); // Analyze up to 50 reviews
+}
+
+
 
 // Feature 6: Review Checker
 function activateReviewChecker() {

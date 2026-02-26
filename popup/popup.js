@@ -34,18 +34,50 @@ chrome.storage.sync.get([
 // Emotion toggle
 document.getElementById('emotionToggle').addEventListener('change', async (e) => {
   const enabled = e.target.checked;
-  await chrome.storage.sync.set({ emotionEnabled: enabled });
   
   if (enabled) {
     const keyboardMode = document.getElementById('keyboardMode').checked;
     if (!keyboardMode) {
-      startWebcam();
+      // Show camera notice with button
+      document.getElementById('cameraNotice').style.display = 'block';
+    } else {
+      await chrome.storage.sync.set({ emotionEnabled: enabled });
     }
   } else {
     stopWebcam();
+    document.getElementById('cameraNotice').style.display = 'none';
+    await chrome.storage.sync.set({ emotionEnabled: false });
   }
+  
   updateEmotionStatus();
   notifyContentScript();
+});
+
+// Camera request button
+document.getElementById('requestCameraBtn').addEventListener('click', async () => {
+  console.log('Camera button clicked');
+  await startWebcam();
+  if (stream) {
+    await chrome.storage.sync.set({ emotionEnabled: true });
+  }
+});
+
+// Show camera notice when hovering over emotion toggle
+document.getElementById('emotionToggle').parentElement.addEventListener('mouseenter', () => {
+  const emotionEnabled = document.getElementById('emotionToggle').checked;
+  const keyboardMode = document.getElementById('keyboardMode').checked;
+  if (!emotionEnabled && !keyboardMode) {
+    document.getElementById('cameraNotice').style.display = 'block';
+  }
+});
+
+document.getElementById('emotionToggle').parentElement.addEventListener('mouseleave', () => {
+  const emotionEnabled = document.getElementById('emotionToggle').checked;
+  if (!emotionEnabled) {
+    setTimeout(() => {
+      document.getElementById('cameraNotice').style.display = 'none';
+    }, 2000);
+  }
 });
 
 // Keyboard mode toggle
@@ -55,8 +87,10 @@ document.getElementById('keyboardMode').addEventListener('change', async (e) => 
   
   if (keyboardMode) {
     stopWebcam();
+    document.getElementById('cameraNotice').style.display = 'none';
   } else if (document.getElementById('emotionToggle').checked) {
-    startWebcam();
+    document.getElementById('cameraNotice').style.display = 'block';
+    await startWebcam();
   }
   notifyContentScript();
 });
@@ -78,18 +112,91 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
 
 async function startWebcam() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    // Check if getUserMedia is available
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showCameraNotSupportedMessage();
+      return;
+    }
+    
+    // Request camera access - this will trigger the browser's permission prompt
+    stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: 'user'
+      } 
+    });
+    
+    console.log('Camera access granted');
+    
     const video = document.getElementById('webcam');
+    if (!video) {
+      throw new Error('Video element not found');
+    }
+    
     video.srcObject = stream;
     document.getElementById('emotionDisplay').classList.remove('hidden');
+    document.getElementById('cameraNotice').style.display = 'none';
     
-    // Start emotion detection
-    emotionInterval = setInterval(() => detectEmotion(), 1000);
+    // Start emotion detection after video is ready
+    video.onloadedmetadata = () => {
+      video.play().then(() => {
+        emotionInterval = setInterval(() => detectEmotion(), 1000);
+      }).catch(err => {
+        console.warn('Video playback error:', err.message);
+        handleCameraError(err);
+      });
+    };
+    
+    // Also handle if metadata is already loaded
+    if (video.readyState >= 2) {
+      video.play().then(() => {
+        emotionInterval = setInterval(() => detectEmotion(), 1000);
+      }).catch(err => {
+        console.warn('Video playback error:', err.message);
+        handleCameraError(err);
+      });
+    }
+    
   } catch (err) {
-    console.error('Webcam access denied:', err);
-    alert('Please allow webcam access for emotion detection');
+    // Handle camera errors silently in console, show user-friendly message
+    handleCameraError(err);
   }
 }
+
+function showCameraNotSupportedMessage() {
+  const message = 'Camera access is not supported in extension popups.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
+  alert(message);
+  document.getElementById('emotionToggle').checked = false;
+  chrome.storage.sync.set({ emotionEnabled: false });
+  document.getElementById('cameraNotice').style.display = 'none';
+}
+
+async function handleCameraError(err) {
+  let errorMessage = '';
+  
+  if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+    errorMessage = 'Camera permission was denied or dismissed.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
+  } else if (err.name === 'NotFoundError') {
+    errorMessage = 'No camera found on your device.\n\nPlease enable "Keyboard Mode" to use emotion detection without a camera.';
+  } else if (err.name === 'NotReadableError') {
+    errorMessage = 'Camera is already in use by another application.\n\nPlease close other apps using the camera, or enable "Keyboard Mode" instead.';
+  } else if (err.name === 'NotSupportedError') {
+    errorMessage = 'Camera access is not supported in this context.\n\nPlease enable "Keyboard Mode" instead.';
+  } else {
+    // Generic error - likely security restriction in extension popup
+    errorMessage = 'Camera access is not available in extension popups.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
+  }
+  
+  alert(errorMessage);
+  
+  // Disable emotion detection if camera fails
+  document.getElementById('emotionToggle').checked = false;
+  await chrome.storage.sync.set({ emotionEnabled: false });
+  document.getElementById('cameraNotice').style.display = 'none';
+}
+
+
 
 function stopWebcam() {
   if (stream) {

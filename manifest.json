@@ -63,7 +63,14 @@
         "*://*.ikea.com/*",
         "*://*.indiamart.com/*"
       ],
-      "js": ["utils/comparison.js", "content/content.js"],
+      "js": [
+        "models/emotion-detection.js",
+        "utils/review-analyzer.js",
+        "utils/ai-recommendation-engine.js",
+        "utils/price-tracker.js",
+        "utils/comparison.js",
+        "content/content.js"
+      ],
       "css": ["content/content.css"],
       "run_at": "document_end"
     }

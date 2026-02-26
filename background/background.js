@@ -31,9 +31,17 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const isShoppingSite = shoppingSites.some(site => tab.url.includes(site));
     
     if (isShoppingSite) {
-      chrome.tabs.sendMessage(tabId, { action: 'pageLoaded' }).catch(() => {
-        // Content script not ready yet
-      });
+      // Check if extension context is still valid before sending message
+      try {
+        chrome.tabs.sendMessage(tabId, { action: 'pageLoaded' }).catch((err) => {
+          // Silently ignore - content script not ready or extension reloaded
+          if (err.message && !err.message.includes('Extension context invalidated')) {
+            console.log('Message send failed:', err.message);
+          }
+        });
+      } catch (err) {
+        // Extension context invalidated - ignore silently
+      }
     }
   }
 });
