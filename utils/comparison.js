@@ -162,7 +162,7 @@ class PriceComparison {
           console.log('PricesAPI: Found', organicResults.length, 'products');
           
           // Process each product result
-          for (const result of organicResults.slice(0, 10)) { // Limit to first 10 results
+          for (const result of organicResults.slice(0, 15)) { // Limit to first 15 results
             console.log('Processing result:', result);
             
             // Extract merchant/source from the link
@@ -177,10 +177,46 @@ class PriceComparison {
               continue;
             }
             
-            // Extract price from the result
-            const priceValue = result.price || result.extracted_price || null;
+            // Extract price from the result - PricesAPI uses 'price' field with currency
+            let priceValue = null;
+            if (result.price) {
+              // Price might be a string like "₹1,29,999" or an object
+              if (typeof result.price === 'string') {
+                // Remove currency symbols and commas, extract number
+                const priceMatch = result.price.replace(/[₹$,\s]/g, '').match(/[\d.]+/);
+                if (priceMatch) {
+                  priceValue = parseFloat(priceMatch[0]);
+                }
+              } else if (typeof result.price === 'number') {
+                priceValue = result.price;
+              }
+            }
+            
+            // Also try extracted_price field
+            if (!priceValue && result.extracted_price) {
+              if (typeof result.extracted_price === 'number') {
+                priceValue = result.extracted_price;
+              } else if (typeof result.extracted_price === 'string') {
+                const priceMatch = result.extracted_price.replace(/[₹$,\s]/g, '').match(/[\d.]+/);
+                if (priceMatch) {
+                  priceValue = parseFloat(priceMatch[0]);
+                }
+              }
+            }
             
             console.log('Extracted - Domain:', urlDomain, 'Price:', priceValue, 'URL:', productUrl);
+            
+            // Only add products that have actual prices and direct product URLs
+            if (!priceValue) {
+              console.log('Skipping - no price found');
+              continue;
+            }
+            
+            // Skip if URL looks like a search page
+            if (productUrl.includes('/s?') || productUrl.includes('/search') || productUrl.includes('?q=')) {
+              console.log('Skipping - search URL detected');
+              continue;
+            }
             
             // Try to match domain to our supported sites
             const matchingSite = this.supportedSites.find(s => 
@@ -188,20 +224,18 @@ class PriceComparison {
             );
             
             if (matchingSite && !currentDomain.includes(matchingSite.domain)) {
-              if (priceValue) {
-                results.availableProducts.push({
-                  site: matchingSite.name,
-                  icon: matchingSite.icon,
-                  url: productUrl,
-                  domain: matchingSite.domain,
-                  price: priceValue,
-                  currency: '₹',
-                  availability: result.delivery || 'Check Availability',
-                  searchMode: false
-                });
-                console.log('Added product:', matchingSite.name, priceValue);
-              }
-            } else if (!matchingSite && priceValue) {
+              results.availableProducts.push({
+                site: matchingSite.name,
+                icon: matchingSite.icon,
+                url: productUrl,
+                domain: matchingSite.domain,
+                price: priceValue,
+                currency: '₹',
+                availability: result.delivery || 'Available',
+                searchMode: false
+              });
+              console.log('Added product:', matchingSite.name, priceValue);
+            } else if (!matchingSite) {
               // Add unmatched sites with generic info
               const merchantName = result.source || urlDomain.replace('www.', '').split('.')[0];
               results.availableProducts.push({
@@ -211,7 +245,7 @@ class PriceComparison {
                 domain: urlDomain,
                 price: priceValue,
                 currency: '₹',
-                availability: 'Check Availability',
+                availability: 'Available',
                 searchMode: false
               });
               console.log('Added unmatched product:', merchantName, priceValue);
@@ -226,8 +260,9 @@ class PriceComparison {
         console.log('PricesAPI: No results in response');
       }
       
-      // If no API results, add relevant sites with search URLs
+      // If no API results with prices, add relevant sites with search URLs as fallback
       if (results.availableProducts.length === 0) {
+        console.log('PricesAPI: No products with prices found, showing search links');
         const relevantSites = this.getRelevantSites(productName, currentDomain);
         results.availableProducts = relevantSites.map(site => ({
           site: site.name,
@@ -236,6 +271,8 @@ class PriceComparison {
           domain: site.domain,
           searchMode: true
         }));
+      } else {
+        console.log('PricesAPI: Successfully found', results.availableProducts.length, 'products with prices');
       }
       
     } catch (error) {

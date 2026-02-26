@@ -494,6 +494,11 @@
   margin-top: 2px;
 }
 
+.esa-comparison-item .site-info .savings.higher {
+  color: #f56565;
+  background: #fff5f5;
+}
+
 .esa-comparison-item.has-price {
   border-color: #48bb78;
   background: #f0fff4;
@@ -502,6 +507,11 @@
 .esa-comparison-item.has-price:hover {
   border-color: #38a169;
   box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.esa-comparison-item.has-price .site-info .price {
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .esa-comparison-item.clickable .site {

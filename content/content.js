@@ -405,42 +405,91 @@ function activateComparison() {
 
       // Show available products on other sites
       if (comparisonData.availableProducts && comparisonData.availableProducts.length > 0) {
-        const hasRealPrices = comparisonData.availableProducts.some(p => p.price);
+        // Separate products with prices from search links
+        const productsWithPrices = comparisonData.availableProducts.filter(p => p.price && !p.searchMode);
+        const searchLinks = comparisonData.availableProducts.filter(p => !p.price || p.searchMode);
         
-        resultsHTML += `
-          <div class="esa-comparison-section">
-            <h4>🛒 ${hasRealPrices ? 'Available On' : 'Check Prices On'}</h4>
-            <div class="esa-comparison-grid">
-              ${comparisonData.availableProducts.map(product => {
-                console.log('Rendering product:', product);
-                
-                const priceDisplay = product.price 
-                  ? `<span class="price">${product.currency || '₹'}${typeof product.price === 'number' ? product.price.toLocaleString('en-IN') : product.price}</span>`
-                  : `<span class="price-status">Click to check price</span>`;
-                
-                const savings = product.price && comparisonData.currentSite && comparisonData.currentSite.price
-                  ? comparisonData.currentSite.price - parseFloat(product.price)
-                  : 0;
-                
-                const savingsDisplay = savings > 0
-                  ? `<span class="savings">Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`
-                  : '';
-                
-                return `
-                  <a href="${product.url}" target="_blank" class="esa-comparison-item clickable ${product.price ? 'has-price' : ''}" title="${product.searchMode ? 'Search on' : 'View on'} ${product.site}">
-                    <span class="site-icon">${product.icon}</span>
-                    <div class="site-info">
-                      <span class="site">${product.site}</span>
-                      ${priceDisplay}
-                      ${savingsDisplay}
-                    </div>
-                    <span class="esa-btn-small">${product.searchMode ? 'Search' : 'View'} →</span>
-                  </a>
-                `;
-              }).join('')}
+        // Show products with actual prices first
+        if (productsWithPrices.length > 0) {
+          resultsHTML += `
+            <div class="esa-comparison-section">
+              <h4>🛒 Available On (${productsWithPrices.length} ${productsWithPrices.length === 1 ? 'site' : 'sites'})</h4>
+              <div class="esa-comparison-grid">
+                ${productsWithPrices.map(product => {
+                  console.log('Rendering product with price:', product);
+                  
+                  const priceDisplay = `<span class="price">${product.currency || '₹'}${typeof product.price === 'number' ? product.price.toLocaleString('en-IN') : product.price}</span>`;
+                  
+                  const savings = product.price && comparisonData.currentSite && comparisonData.currentSite.price
+                    ? comparisonData.currentSite.price - parseFloat(product.price)
+                    : 0;
+                  
+                  const savingsDisplay = savings > 0
+                    ? `<span class="savings">Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`
+                    : savings < 0
+                    ? `<span class="savings higher">+₹${Math.abs(Math.round(savings)).toLocaleString('en-IN')}</span>`
+                    : '';
+                  
+                  return `
+                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable has-price" title="View on ${product.site}">
+                      <span class="site-icon">${product.icon}</span>
+                      <div class="site-info">
+                        <span class="site">${product.site}</span>
+                        ${priceDisplay}
+                        ${savingsDisplay}
+                      </div>
+                      <span class="esa-btn-small">View →</span>
+                    </a>
+                  `;
+                }).join('')}
+              </div>
             </div>
-          </div>
-        `;
+          `;
+        }
+        
+        // Show search links separately if there are products with prices
+        if (searchLinks.length > 0 && productsWithPrices.length > 0) {
+          resultsHTML += `
+            <div class="esa-comparison-section">
+              <h4>🔍 Also Check On</h4>
+              <div class="esa-comparison-grid">
+                ${searchLinks.map(product => {
+                  return `
+                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable" title="Search on ${product.site}">
+                      <span class="site-icon">${product.icon}</span>
+                      <div class="site-info">
+                        <span class="site">${product.site}</span>
+                        <span class="price-status">Click to check price</span>
+                      </div>
+                      <span class="esa-btn-small">Search →</span>
+                    </a>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        } else if (searchLinks.length > 0 && productsWithPrices.length === 0) {
+          // Only search links available
+          resultsHTML += `
+            <div class="esa-comparison-section">
+              <h4>🔍 Check Prices On</h4>
+              <div class="esa-comparison-grid">
+                ${searchLinks.map(product => {
+                  return `
+                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable" title="Search on ${product.site}">
+                      <span class="site-icon">${product.icon}</span>
+                      <div class="site-info">
+                        <span class="site">${product.site}</span>
+                        <span class="price-status">Click to check price</span>
+                      </div>
+                      <span class="esa-btn-small">Search →</span>
+                    </a>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
       } else {
         resultsHTML += `
           <div class="esa-comparison-section">
