@@ -144,6 +144,47 @@
   color: #48bb78;
 }
 
+.esa-compare-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(72, 187, 120, 0.3);
+}
+
+.esa-compare-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(72, 187, 120, 0.4);
+}
+
+.esa-compare-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.esa-compare-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.esa-compare-btn .btn-icon {
+  font-size: 20px;
+}
+
+.esa-compare-btn .btn-text {
+  font-size: 15px;
+}
+
 .esa-comparison-loading {
   text-align: center;
   padding: 20px;
@@ -219,6 +260,50 @@
   text-align: center;
   padding: 20px;
   color: #666;
+  font-style: italic;
+}
+
+/* New stat boxes row */
+.esa-rec-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.esa-rec-stat-box {
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.esa-rec-stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.esa-rec-stat-box .stat-label {
+  font-size: 11px;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.esa-rec-stat-box .stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.2;
+}
+
+.esa-rec-stat-box .stat-reason {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
   font-style: italic;
 }
 
@@ -533,6 +618,44 @@
   font-weight: 800;
 }
 
+.esa-comparison-item.best-price {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.esa-comparison-item.best-price:hover {
+  border-color: #d97706;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+}
+
+.esa-comparison-item .site-info .savings.best {
+  color: #d97706;
+  background: #fef3c7;
+  font-weight: 700;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.esa-comparison-item .site-info .retailer-name {
+  font-size: 10px;
+  color: #666;
+  font-weight: normal;
+  font-style: italic;
+}
+
+.esa-price-range {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #48bb78;
+  border: 2px solid #e0e0e0;
+}
+
 .esa-comparison-item.clickable .site {
   font-size: 12px;
   font-weight: 600;
@@ -591,11 +714,46 @@
   font-size: 13px;
 }
 
+.esa-info-list {
+  text-align: left;
+  margin: 10px 0;
+  padding-left: 20px;
+  font-size: 12px;
+  color: #666;
+}
+
+.esa-info-list li {
+  margin: 6px 0;
+}
+
 .esa-error {
   text-align: center;
   padding: 20px;
   color: #f56565;
   font-weight: 600;
+}
+
+.esa-retry-btn {
+  margin-top: 12px;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.esa-retry-btn:hover {
+  background: #5568d3;
+}
+
+.availability {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+  margin-top: 2px;
 }
 
 /* Responsive adjustments */
@@ -616,4 +774,232 @@
   .esa-comparison-item.clickable .site {
     font-size: 11px;
   }
+  
+  /* Responsive recommendation stats */
+  .esa-rec-stats-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .esa-rec-stat-box .stat-value {
+    font-size: 20px;
+  }
+  
+  .esa-rec-factors {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Training Status and Feedback Controls */
+.esa-training-status {
+  background: #f0f7ff;
+  border-radius: 6px;
+  padding: 8px;
+  margin: 8px 0;
+  font-size: 11px;
+  color: #555;
+}
+
+.training-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.esa-feedback-controls {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  justify-content: center;
+}
+
+.esa-feedback-btn {
+  flex: 1;
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.esa-feedback-btn:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.esa-feedback-btn:active {
+  transform: translateY(0);
+}
+
+.esa-feedback-btn[data-feedback="incorrect"] {
+  background: #f56565;
+}
+
+.esa-feedback-btn[data-feedback="incorrect"]:hover {
+  background: #e53e3e;
+  box-shadow: 0 2px 8px rgba(245, 101, 101, 0.3);
+}
+
+/* Training stats in popup */
+.training-stats {
+  background: #f0f7ff;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.training-stats div {
+  margin: 4px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.training-stats span {
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* Search link styling */
+.esa-comparison-item.search-link {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.esa-comparison-item.search-link:hover {
+  border-color: #2563eb;
+  background: #dbeafe;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.esa-comparison-item.search-link .availability {
+  color: #3b82f6;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+
+/* Inline Camera Section */
+.esa-camera-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 2px solid #667eea;
+}
+
+.esa-camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.esa-camera-status {
+  background: white;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  line-height: 1.5;
+  border: 1px solid #e0e0e0;
+}
+
+.esa-camera-close {
+  background: #f56565;
+  color: white;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.esa-camera-close:hover {
+  background: #e53e3e;
+  transform: scale(1.1);
+}
+
+.esa-camera-container {
+  position: relative;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  min-height: 180px;
+}
+
+#esa-webcam {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+#esa-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.esa-camera-overlay {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 90%;
+  text-align: center;
+}
+
+.esa-camera-toggle {
+  width: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.esa-camera-toggle:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.esa-camera-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.esa-camera-toggle:active:not(:disabled) {
+  transform: translateY(0);
 }

@@ -1,28 +1,31 @@
 // Price comparison utilities
 class PriceComparison {
   constructor() {
-    this.supportedSites = [
-      // US Sites
-      { name: 'Amazon', domain: 'amazon.com', searchUrl: 'https://www.amazon.com/s?k=', icon: '🛒' },
-      { name: 'Walmart', domain: 'walmart.com', searchUrl: 'https://www.walmart.com/search?q=', icon: '🏪' },
-      { name: 'eBay', domain: 'ebay.com', searchUrl: 'https://www.ebay.com/sch/i.html?_nkw=', icon: '🔨' },
-      { name: 'Target', domain: 'target.com', searchUrl: 'https://www.target.com/s?searchTerm=', icon: '🎯' },
-      { name: 'Best Buy', domain: 'bestbuy.com', searchUrl: 'https://www.bestbuy.com/site/searchpage.jsp?st=', icon: '💻' },
-      
-      // Indian Sites
-      { name: 'Flipkart', domain: 'flipkart.com', searchUrl: 'https://www.flipkart.com/search?q=', icon: '�️' },
-      { name: 'Amazon India', domain: 'amazon.in', searchUrl: 'https://www.amazon.in/s?k=', icon: '�' },
-      { name: 'Myntra', domain: 'myntra.com', searchUrl: 'https://www.myntra.com/', icon: '👗' },
-      { name: 'Snapdeal', domain: 'snapdeal.com', searchUrl: 'https://www.snapdeal.com/search?keyword=', icon: '�' },
-      { name: 'Croma', domain: 'croma.com', searchUrl: 'https://www.croma.com/searchB?q=', icon: '�' },
-      { name: 'Reliance Digital', domain: 'reliancedigital.in', searchUrl: 'https://www.reliancedigital.in/search?q=', icon: '🔌' }
-    ];
-    
     // API configuration for PricesAPI.io
     this.apiConfig = {
       endpoint: 'https://api.pricesapi.io/api/v1',
       apiKey: 'pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt',
-      enabled: true
+      enabled: true,
+      timeout: 15000 // 15 second timeout for real-time scraping
+    };
+    
+    // Site icons mapping for known retailers
+    this.siteIcons = {
+      'amazon': '🛒',
+      'flipkart': '🛍️',
+      'walmart': '🏪',
+      'ebay': '🔨',
+      'target': '🎯',
+      'bestbuy': '💻',
+      'myntra': '👗',
+      'snapdeal': '🛍️',
+      'croma': '📱',
+      'reliance': '🔌',
+      'tata': '🏬',
+      'ajio': '👔',
+      'nykaa': '💄',
+      'meesho': '🛒',
+      'default': '🛒'
     };
   }
 
@@ -79,290 +82,354 @@ class PriceComparison {
     // Extract product identifiers for better matching
     const identifiers = this.extractProductIdentifiers();
     
-    // Try to fetch real prices from API
+    // Always use API - no fallback to predefined sites
     if (this.apiConfig.enabled && this.apiConfig.apiKey) {
-      try {
-        const apiResults = await this.searchProductWithAPI(productName, identifiers, currentPrice);
-        if (apiResults && apiResults.availableProducts.length > 0) {
-          return apiResults;
-        }
-      } catch (error) {
-        console.error('API search failed, falling back to search URLs:', error);
+      const apiResults = await this.searchProductWithAPI(productName, identifiers, currentPrice);
+      
+      // If API returns null, return empty results structure
+      if (!apiResults) {
+        return {
+          currentSite: this.getCurrentSiteInfo(currentPrice),
+          availableProducts: [],
+          productName: productName,
+          identifiers: identifiers,
+          apiUsed: false,
+          error: 'API request failed'
+        };
       }
+      
+      return apiResults;
     }
     
-    // Fallback: Use search URLs if API fails or is not configured
-    const results = await this.searchProductAcrossSites(productName, identifiers, currentPrice);
-    return results;
+    // If API is disabled, return empty results
+    return {
+      currentSite: this.getCurrentSiteInfo(currentPrice),
+      availableProducts: [],
+      productName: productName,
+      identifiers: identifiers,
+      apiUsed: false,
+      error: 'API is disabled'
+    };
+  }
+  
+  getCurrentSiteInfo(currentPrice) {
+    const currentDomain = window.location.hostname;
+    const siteName = this.extractSiteName(currentDomain);
+    const icon = this.getSiteIcon(currentDomain);
+    
+    return {
+      site: siteName,
+      icon: icon,
+      price: currentPrice,
+      url: window.location.href,
+      domain: currentDomain
+    };
+  }
+  
+  extractSiteName(domain) {
+    // Extract readable site name from domain
+    const domainParts = domain.replace('www.', '').split('.');
+    const mainDomain = domainParts[0];
+    return mainDomain.charAt(0).toUpperCase() + mainDomain.slice(1);
+  }
+  
+  getSiteIcon(domain) {
+    // Get icon based on domain
+    for (const [key, icon] of Object.entries(this.siteIcons)) {
+      if (domain.includes(key)) {
+        return icon;
+      }
+    }
+    return this.siteIcons.default;
   }
 
   async searchProductWithAPI(productName, identifiers, currentPrice) {
     const currentDomain = window.location.hostname;
     const results = {
-      currentSite: null,
+      currentSite: this.getCurrentSiteInfo(currentPrice),
       availableProducts: [],
       productName: productName,
       identifiers: identifiers,
       apiUsed: true
     };
 
-    // Identify current site
-    for (const site of this.supportedSites) {
-      if (currentDomain.includes(site.domain)) {
-        results.currentSite = {
-          site: site.name,
-          icon: site.icon,
-          price: currentPrice,
-          url: window.location.href,
-          domain: site.domain
-        };
-        break;
-      }
-    }
-
     try {
-      // Search for the product using PricesAPI.io
-      // Note: PricesAPI uses /jobs endpoint for product searches
-      const searchUrl = `${this.apiConfig.endpoint}/jobs?api_key=${this.apiConfig.apiKey}`;
+      // Step 1: Try multiple search variations to find the product
+      const searchVariations = this.generateSearchVariations(productName);
+      console.log('PricesAPI: Trying search variations:', searchVariations);
       
-      console.log('PricesAPI: Searching for:', productName);
+      let allProducts = [];
       
-      // PricesAPI requires POST request with job parameters
-      const response = await fetch(searchUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          source: 'google_shopping',
-          country: 'in',
-          query: productName,
-          parse: true
-        })
-      }).catch(err => {
-        console.warn('PricesAPI: Network error, using fallback search links:', err.message);
-        return null;
-      });
-      
-      if (!response) {
-        return null;
-      }
-      
-      if (!response.ok) {
-        console.warn('PricesAPI: Request failed with status', response.status, '- using fallback search links');
-        return null;
-      }
-      
-      const data = await response.json();
-      console.log('PricesAPI: Search response:', data);
-      
-      // Process API results from PricesAPI job response
-      if (data && data.results) {
-        console.log('PricesAPI: Job results:', data.results);
+      // Try each search variation
+      for (const searchTerm of searchVariations) {
+        console.log('PricesAPI: Searching for:', searchTerm);
         
-        // PricesAPI returns results with organic_results containing products
-        const organicResults = data.results.organic_results || [];
+        const searchResponse = await Promise.race([
+          new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage({
+              action: 'pricesApiSearch',
+              productName: searchTerm,
+              country: 'in',
+              limit: 50,
+              apiKey: this.apiConfig.apiKey
+            }, response => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else if (response && response.success) {
+                resolve(response.data);
+              } else {
+                reject(new Error(response?.error || 'Search failed'));
+              }
+            });
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('API timeout')), this.apiConfig.timeout)
+          )
+        ]).catch(err => {
+          console.warn('PricesAPI: Search error for', searchTerm, ':', err.message);
+          return null;
+        });
         
-        if (organicResults.length > 0) {
-          console.log('PricesAPI: Found', organicResults.length, 'products');
+        if (searchResponse && searchResponse.products && searchResponse.products.length > 0) {
+          console.log('PricesAPI: Found', searchResponse.products.length, 'products for:', searchTerm);
+          allProducts = allProducts.concat(searchResponse.products);
           
-          // Process each product result
-          for (const result of organicResults.slice(0, 15)) { // Limit to first 15 results
-            console.log('Processing result:', result);
-            
-            // Extract merchant/source from the link
-            const productUrl = result.link || result.url;
-            if (!productUrl) continue;
-            
-            let urlDomain = '';
-            try {
-              urlDomain = new URL(productUrl).hostname;
-            } catch (e) {
-              console.error('Invalid URL:', productUrl);
-              continue;
-            }
-            
-            // Extract price from the result - PricesAPI uses 'price' field with currency
-            let priceValue = null;
-            if (result.price) {
-              // Price might be a string like "₹1,29,999" or an object
-              if (typeof result.price === 'string') {
-                // Remove currency symbols and commas, extract number
-                const priceMatch = result.price.replace(/[₹$,\s]/g, '').match(/[\d.]+/);
-                if (priceMatch) {
-                  priceValue = parseFloat(priceMatch[0]);
+          // If we found enough products, stop searching
+          if (allProducts.length >= 20) {
+            break;
+          }
+        }
+      }
+      
+      // Remove duplicates based on product ID
+      const uniqueProducts = Array.from(new Map(allProducts.map(p => [p.id, p])).values());
+      console.log('PricesAPI: Total unique products found:', uniqueProducts.length);
+      
+      if (uniqueProducts.length === 0) {
+        console.log('PricesAPI: No products found in search results');
+        return results;
+      }
+      
+      // Step 2: Get offers for ALL matching products
+      const seenRetailers = new Set();
+      const productsToCheck = uniqueProducts.slice(0, 10); // Check top 10 matches
+      
+      for (const product of productsToCheck) {
+        const productId = product.id;
+        console.log('PricesAPI: Fetching offers for product:', product.title);
+        
+        try {
+          const offersResponse = await Promise.race([
+            new Promise((resolve, reject) => {
+              chrome.runtime.sendMessage({
+                action: 'pricesApiOffers',
+                productId: productId,
+                country: 'in',
+                apiKey: this.apiConfig.apiKey
+              }, response => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                } else if (response && response.success) {
+                  resolve(response.data);
+                } else {
+                  reject(new Error(response?.error || 'Offers fetch failed'));
                 }
-              } else if (typeof result.price === 'number') {
-                priceValue = result.price;
-              }
-            }
-            
-            // Also try extracted_price field
-            if (!priceValue && result.extracted_price) {
-              if (typeof result.extracted_price === 'number') {
-                priceValue = result.extracted_price;
-              } else if (typeof result.extracted_price === 'string') {
-                const priceMatch = result.extracted_price.replace(/[₹$,\s]/g, '').match(/[\d.]+/);
-                if (priceMatch) {
-                  priceValue = parseFloat(priceMatch[0]);
-                }
-              }
-            }
-            
-            console.log('Extracted - Domain:', urlDomain, 'Price:', priceValue, 'URL:', productUrl);
-            
-            // Only add products that have actual prices and direct product URLs
-            if (!priceValue) {
-              console.log('Skipping - no price found');
-              continue;
-            }
-            
-            // Skip if URL looks like a search page
-            if (productUrl.includes('/s?') || productUrl.includes('/search') || productUrl.includes('?q=')) {
-              console.log('Skipping - search URL detected');
-              continue;
-            }
-            
-            // Try to match domain to our supported sites
-            const matchingSite = this.supportedSites.find(s => 
-              urlDomain.includes(s.domain) || s.domain.includes(urlDomain.replace('www.', ''))
-            );
-            
-            if (matchingSite && !currentDomain.includes(matchingSite.domain)) {
-              results.availableProducts.push({
-                site: matchingSite.name,
-                icon: matchingSite.icon,
-                url: productUrl,
-                domain: matchingSite.domain,
-                price: priceValue,
-                currency: '₹',
-                availability: result.delivery || 'Available',
-                searchMode: false
               });
-              console.log('Added product:', matchingSite.name, priceValue);
-            } else if (!matchingSite) {
-              // Add unmatched sites with generic info
-              const merchantName = result.source || urlDomain.replace('www.', '').split('.')[0];
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('API timeout')), this.apiConfig.timeout)
+            )
+          ]);
+          
+          console.log('PricesAPI: Offers response for', product.title, ':', offersResponse);
+          
+          // Step 3: Process offers from different retailers
+          if (offersResponse && offersResponse.offers && offersResponse.offers.length > 0) {
+            console.log('PricesAPI: Found', offersResponse.offers.length, 'offers for this product');
+            
+            for (const offer of offersResponse.offers) {
+              const retailerName = offer.seller || offer.merchant || offer.source || 'Unknown Retailer';
+              const offerUrl = offer.url || offer.link;
+              const price = offer.price;
+              const currency = offer.currency || '₹';
+              const availability = offer.availability || offer.stock_status || 'Check Availability';
+              
+              if (!offerUrl || !price) {
+                continue;
+              }
+              
+              // Extract domain from URL
+              let urlDomain = '';
+              try {
+                urlDomain = new URL(offerUrl).hostname.replace('www.', '');
+              } catch (e) {
+                console.error('Invalid offer URL:', offerUrl);
+                continue;
+              }
+              
+              // Skip if it's the current site
+              if (currentDomain.includes(urlDomain) || urlDomain.includes(currentDomain.replace('www.', ''))) {
+                continue;
+              }
+              
+              // Skip if we already have this retailer (avoid duplicates)
+              if (seenRetailers.has(urlDomain)) {
+                continue;
+              }
+              
+              seenRetailers.add(urlDomain);
+              
+              // Get site name and icon
+              const siteName = this.extractSiteName(urlDomain);
+              const siteIcon = this.getSiteIcon(urlDomain);
+              
+              // Add offer to results
               results.availableProducts.push({
-                site: merchantName.charAt(0).toUpperCase() + merchantName.slice(1),
-                icon: '🛒',
-                url: productUrl,
+                site: siteName,
+                icon: siteIcon,
+                url: offerUrl,
                 domain: urlDomain,
-                price: priceValue,
-                currency: '₹',
-                availability: 'Available',
-                searchMode: false
+                price: parseFloat(price),
+                currency: currency,
+                availability: availability,
+                searchMode: false,
+                retailerName: retailerName,
+                productTitle: product.title
               });
-              console.log('Added unmatched product:', merchantName, priceValue);
+              
+              console.log('Added offer:', siteName, price, currency);
             }
           }
-          
-          console.log('PricesAPI: Total processed products:', results.availableProducts.length);
-        } else {
-          console.log('PricesAPI: No organic results found');
+        } catch (err) {
+          console.warn('PricesAPI: Error fetching offers for product', productId, ':', err.message);
+          // Continue with next product
         }
-      } else {
-        console.log('PricesAPI: No results in response');
       }
       
-      // If no API results with prices, add relevant sites with search URLs as fallback
+      console.log('PricesAPI: Total unique retailers found:', results.availableProducts.length);
+      
+      // If no offers found, add fallback search links
       if (results.availableProducts.length === 0) {
-        console.log('PricesAPI: No products with prices found, showing search links');
-        const relevantSites = this.getRelevantSites(productName, currentDomain);
-        results.availableProducts = relevantSites.map(site => ({
-          site: site.name,
-          icon: site.icon,
-          url: site.searchUrl + encodeURIComponent(productName),
-          domain: site.domain,
-          searchMode: true
-        }));
+        console.log('PricesAPI: No offers found, adding fallback search links');
+        const fallbackLinks = this.generateFallbackSearchLinks(productName);
+        results.availableProducts = fallbackLinks;
+        results.fallbackMode = true;
+      }
+      
+      // Sort by price (lowest first)
+      if (results.availableProducts.length > 0 && !results.fallbackMode) {
+        results.availableProducts.sort((a, b) => a.price - b.price);
+        console.log('PricesAPI: Successfully found', results.availableProducts.length, 'offers with prices');
+      } else if (results.fallbackMode) {
+        console.log('PricesAPI: Using fallback search links for', results.availableProducts.length, 'retailers');
       } else {
-        console.log('PricesAPI: Successfully found', results.availableProducts.length, 'products with prices');
+        console.log('PricesAPI: No products with prices found');
       }
       
     } catch (error) {
-      console.warn('PricesAPI error, using fallback search links:', error.message);
-      // Return null to trigger fallback to search URLs
-      return null;
+      console.warn('PricesAPI error:', error.message);
+      results.error = error.message;
+      return results;
     }
 
     return results;
   }
 
-  async searchProductAcrossSites(productName, identifiers, currentPrice) {
-    // This simulates API calls - in production, you'd use real price comparison APIs
-    // For now, we'll use a smart filtering approach
+  // Generate multiple search variations to improve product matching
+  generateSearchVariations(productName) {
+    const variations = [productName]; // Original search term
     
-    const currentDomain = window.location.hostname;
-    const results = {
-      currentSite: null,
-      availableProducts: [],
-      productName: productName,
-      identifiers: identifiers
-    };
-
-    // Identify current site
-    for (const site of this.supportedSites) {
-      if (currentDomain.includes(site.domain)) {
-        results.currentSite = {
-          site: site.name,
-          icon: site.icon,
-          price: currentPrice,
-          url: window.location.href,
-          domain: site.domain
-        };
-        break;
+    // Remove common words that might limit results
+    const wordsToRemove = ['(', ')', '-', 'GB', 'TB', 'MB', 'Blue', 'Black', 'White', 'Red', 'Green', 'Gold', 'Silver'];
+    let simplified = productName;
+    
+    wordsToRemove.forEach(word => {
+      simplified = simplified.replace(new RegExp(word, 'gi'), ' ');
+    });
+    simplified = simplified.replace(/\s+/g, ' ').trim();
+    
+    if (simplified !== productName && simplified.length > 3) {
+      variations.push(simplified);
+    }
+    
+    // Extract brand and model (first 2-3 words)
+    const words = productName.split(' ');
+    if (words.length >= 3) {
+      const brandModel = words.slice(0, 3).join(' ');
+      if (!variations.includes(brandModel)) {
+        variations.push(brandModel);
       }
     }
-
-    // For demonstration: Only show relevant sites based on product category
-    // In production, this would be replaced with actual API calls
-    const relevantSites = this.getRelevantSites(productName, currentDomain);
     
-    results.availableProducts = relevantSites.map(site => ({
-      site: site.name,
-      icon: site.icon,
-      url: site.searchUrl + encodeURIComponent(productName),
-      domain: site.domain,
-      searchMode: true // Indicates this is a search link, not direct product link
-    }));
+    // Try just brand and first word of model
+    if (words.length >= 2) {
+      const shortVersion = words.slice(0, 2).join(' ');
+      if (!variations.includes(shortVersion)) {
+        variations.push(shortVersion);
+      }
+    }
+    
+    return variations.slice(0, 3); // Return max 3 variations
+  }
 
+  // Helper method to process search results when offers are not available
+  processSearchResults(searchData, currentDomain, results) {
+    // No fallback - if offers API fails, return empty results
+    console.log('PricesAPI: Offers API failed, no fallback available');
     return results;
   }
 
-  getRelevantSites(productName, currentDomain) {
-    // Smart filtering based on product type and current site
-    const productLower = productName.toLowerCase();
-    let relevantSites = [];
+  // Generate direct search links for major Indian retailers as fallback
+  generateFallbackSearchLinks(productName) {
+    const encodedName = encodeURIComponent(productName);
+    const fallbackRetailers = [
+      {
+        name: 'Flipkart',
+        domain: 'flipkart.com',
+        icon: '🛍️',
+        searchUrl: `https://www.flipkart.com/search?q=${encodedName}`
+      },
+      {
+        name: 'Snapdeal',
+        domain: 'snapdeal.com',
+        icon: '🛍️',
+        searchUrl: `https://www.snapdeal.com/search?keyword=${encodedName}`
+      },
+      {
+        name: 'Croma',
+        domain: 'croma.com',
+        icon: '📱',
+        searchUrl: `https://www.croma.com/search?q=${encodedName}`
+      },
+      {
+        name: 'Reliance Digital',
+        domain: 'reliancedigital.in',
+        icon: '🔌',
+        searchUrl: `https://www.reliancedigital.in/search?q=${encodedName}`
+      },
+      {
+        name: 'Tata CLiQ',
+        domain: 'tatacliq.com',
+        icon: '🏬',
+        searchUrl: `https://www.tatacliq.com/search/?searchText=${encodedName}`
+      }
+    ];
 
-    // Electronics - show tech retailers
-    if (productLower.match(/phone|laptop|computer|tablet|tv|camera|headphone|speaker|watch/i)) {
-      relevantSites = this.supportedSites.filter(s => 
-        ['Amazon', 'Amazon India', 'Flipkart', 'Best Buy', 'Croma', 'Reliance Digital', 'Walmart', 'Target'].includes(s.name)
-      );
-    }
-    // Fashion - show fashion retailers
-    else if (productLower.match(/shirt|dress|jeans|shoes|clothing|fashion|wear/i)) {
-      relevantSites = this.supportedSites.filter(s => 
-        ['Amazon', 'Amazon India', 'Flipkart', 'Myntra', 'Walmart', 'Target'].includes(s.name)
-      );
-    }
-    // General products - show major marketplaces
-    else {
-      relevantSites = this.supportedSites.filter(s => 
-        ['Amazon', 'Amazon India', 'Flipkart', 'Walmart', 'eBay', 'Snapdeal'].includes(s.name)
-      );
-    }
-
-    // Remove current site from results
-    return relevantSites.filter(s => !currentDomain.includes(s.domain));
-  }
-
-  generateSearchUrls(productName) {
-    return this.supportedSites.map(site => ({
-      site: site.name,
-      url: site.searchUrl + encodeURIComponent(productName)
+    const currentDomain = window.location.hostname;
+    
+    return fallbackRetailers.filter(retailer => 
+      !currentDomain.includes(retailer.domain)
+    ).map(retailer => ({
+      site: retailer.name,
+      icon: retailer.icon,
+      url: retailer.searchUrl,
+      domain: retailer.domain,
+      price: null,
+      currency: '₹',
+      availability: 'Search on site',
+      searchMode: true,
+      retailerName: retailer.name,
+      productTitle: productName
     }));
   }
 

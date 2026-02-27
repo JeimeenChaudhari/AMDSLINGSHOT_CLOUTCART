@@ -68,7 +68,9 @@ class AIRecommendationEngine {
         fakeReviewPercentage: reviewAnalysis.fakePercentage,
         authenticReviews: reviewAnalysis.authenticCount,
         suspiciousPatterns: reviewAnalysis.suspiciousPatterns
-      }
+      },
+      purchaseRecommendation: this.generatePurchaseRecommendation(productData, reviewAnalysis, ratingAnalysis),
+      totalReviews: reviews.length || reviewCount || 0
     };
   }
 
@@ -294,9 +296,11 @@ class AIRecommendationEngine {
   generateReasoning(decision, factors, emotionalContext, priceAnalysis, reviewAnalysis, ratingAnalysis) {
     const parts = [];
     
-    // 1. Emotional state interpretation
+    // 1. Emotional state interpretation (skip if neutral/calm)
     const emotionText = this.getEmotionalStateText(emotionalContext);
-    parts.push(emotionText);
+    if (emotionText) {
+      parts.push(emotionText);
+    }
     
     // 2. Review authenticity insight
     const reviewText = this.getReviewAuthenticityText(reviewAnalysis, factors.fakeReviewRisk);
@@ -309,10 +313,6 @@ class AIRecommendationEngine {
     // 4. Price timing insight
     const priceText = this.getPriceTimingText(priceAnalysis);
     parts.push(priceText);
-    
-    // 5. Risk/regret indicator
-    const riskText = this.getRiskIndicatorText(decision, emotionalContext, factors);
-    parts.push(riskText);
     
     return parts.join(' ');
   }
@@ -327,7 +327,8 @@ class AIRecommendationEngine {
     } else if (isImpulsive) {
       return `Detected ${emotion.toLowerCase()} emotion with impulsive patterns—consider waiting to avoid regret.`;
     } else {
-      return `Your ${emotion.toLowerCase()} state indicates ${behaviorPattern.toLowerCase()}, suitable for decision-making.`;
+      // Return empty string for neutral calm browsing - we'll skip this part
+      return '';
     }
   }
 
@@ -347,9 +348,9 @@ class AIRecommendationEngine {
     if (ratingAnalysis.isWellRated) {
       return `Product shows consistent satisfaction with stable ratings across ${ratingAnalysis.hasEnoughReviews ? 'many' : 'several'} reviews.`;
     } else if (!ratingAnalysis.hasEnoughReviews) {
-      return `Limited review history makes satisfaction trends uncertain—more data needed.`;
+      return `Limited review history makes satisfaction trends uncertain.`;
     } else {
-      return `Rating consistency is moderate—customer satisfaction varies.`;
+      return `Customer satisfaction varies across reviews.`;
     }
   }
 
@@ -361,7 +362,65 @@ class AIRecommendationEngine {
     } else if (priceAnalysis.trend === 'Price increase') {
       return `Price trending upward by ${Math.round(priceAnalysis.priceChange)}%—timing is suboptimal.`;
     } else {
-      return `Price is stable with no significant trends detected.`;
+      return `Price is stable.`;
+    }
+  }
+
+  /**
+   * Generate purchase recommendation based on reviews and ratings
+   */
+  generatePurchaseRecommendation(productData, reviewAnalysis, ratingAnalysis) {
+    const { rating, reviewCount } = productData;
+    const { fakePercentage } = reviewAnalysis;
+    
+    // Calculate star distribution (simplified - in real scenario, extract from page)
+    // For now, we'll infer from rating
+    const avgRating = rating || 0;
+    const fakeRisk = fakePercentage || 0;
+    
+    // Decision logic based on fake reviews and ratings
+    if (fakeRisk > 50) {
+      return {
+        recommendation: 'NOT_BUY',
+        label: '❌ Not Recommended',
+        reason: 'High fake review risk detected',
+        color: '#f44336'
+      };
+    } else if (fakeRisk > 30) {
+      return {
+        recommendation: 'SELECT_ALTERNATIVE',
+        label: '⚠️ Select Alternative',
+        reason: 'Moderate fake review concerns',
+        color: '#ff9800'
+      };
+    } else if (avgRating >= 4.0 && reviewCount >= 50 && fakeRisk < 20) {
+      return {
+        recommendation: 'YOU_SHOULD_BUY',
+        label: '✅ You Should Buy',
+        reason: 'Authentic reviews with high ratings',
+        color: '#4caf50'
+      };
+    } else if (avgRating >= 3.5 && fakeRisk < 25) {
+      return {
+        recommendation: 'LATER',
+        label: '⏳ Consider Later',
+        reason: 'Wait for more reviews or better price',
+        color: '#2196f3'
+      };
+    } else if (avgRating < 3.5) {
+      return {
+        recommendation: 'SELECT_ALTERNATIVE',
+        label: '⚠️ Select Alternative',
+        reason: 'Low customer satisfaction',
+        color: '#ff9800'
+      };
+    } else {
+      return {
+        recommendation: 'LATER',
+        label: '⏳ Consider Later',
+        reason: 'Insufficient data for confident decision',
+        color: '#2196f3'
+      };
     }
   }
 

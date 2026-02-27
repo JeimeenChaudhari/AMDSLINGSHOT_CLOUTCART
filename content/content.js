@@ -5,6 +5,52 @@ let mouseActivity = { clicks: 0, movements: 0, lastActivity: Date.now() };
 let keyboardActivity = { keyPresses: 0, lastActivity: Date.now() };
 let activityData = { clicks: 0, movements: 0, timeSpent: 0, scrolls: 0, startTime: Date.now() };
 
+// Behavioral detection
+let emotionDetector = null;
+let lastSampleId = null;
+
+// Load face-api.js dynamically for camera mode
+function loadFaceApiScript() {
+  return new Promise((resolve, reject) => {
+    if (typeof faceapi !== 'undefined') {
+      console.log('[Content] face-api.js already loaded');
+      resolve();
+      return;
+    }
+    
+    console.log('[Content] Loading face-api.js from CDN...');
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js';
+    script.crossOrigin = 'anonymous';
+    
+    script.onload = () => {
+      console.log('[Content] ✅ face-api.js loaded successfully');
+      // Wait a bit for the library to initialize
+      setTimeout(() => {
+        if (typeof faceapi !== 'undefined') {
+          resolve();
+        } else {
+          reject(new Error('face-api.js loaded but not available'));
+        }
+      }, 100);
+    };
+    
+    script.onerror = (error) => {
+      console.error('[Content] ❌ Failed to load face-api.js from CDN:', error);
+      reject(new Error('Failed to load face-api.js - CDN may be blocked or internet connection issue'));
+    };
+    
+    document.head.appendChild(script);
+    
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      if (typeof faceapi === 'undefined') {
+        reject(new Error('Timeout loading face-api.js - check internet connection'));
+      }
+    }, 10000);
+  });
+}
+
 // Initialize
 init();
 
@@ -14,6 +60,11 @@ async function init() {
   startFeatures();
   setupListeners();
 }
+
+// Callback for behavioral emotion updates
+window.updateEmotionFromBehavioral = function(prediction) {
+  updateEmotion(prediction.emotion, prediction.confidence);
+};
 
 async function loadSettings() {
   return new Promise((resolve) => {
@@ -50,19 +101,393 @@ function injectUI() {
       <button class="esa-minimize">−</button>
     </div>
     <div class="esa-content">
+      <div class="esa-camera-section" style="display: none;">
+        <div class="esa-camera-header">
+          <span>📷 Real-Time Face Detection</span>
+          <button class="esa-camera-close">×</button>
+        </div>
+        <div class="esa-camera-status" id="esa-camera-status">
+          Click "Start Camera" to begin real-time emotion detection from your face
+        </div>
+        <div class="esa-camera-container" style="display: none;">
+          <video id="esa-webcam" autoplay playsinline></video>
+          <canvas id="esa-canvas"></canvas>
+          <div class="esa-camera-overlay">
+            <span id="esa-camera-emotion">😐 Detecting...</span>
+          </div>
+        </div>
+        <button class="esa-camera-toggle" id="esa-start-camera">📷 Start Camera</button>
+      </div>
       <div class="esa-emotion">
         <span class="esa-emotion-icon">😐</span>
         <span class="esa-emotion-text">Neutral</span>
+      </div>
+      <div class="esa-training-status"></div>
+      <div class="esa-feedback-controls" style="display: none;">
+        <button class="esa-feedback-btn" data-feedback="correct">👍 Correct</button>
+        <button class="esa-feedback-btn" data-feedback="incorrect">👎 Wrong</button>
       </div>
       <div class="esa-insights"></div>
     </div>
   `;
   document.body.appendChild(panel);
 
+  // Camera controls
+  let cameraStream = null;
+  let cameraInterval = null;
+  let faceApiLoaded = false;
+  let useSimpleDetector = false;
+  let simpleDetector = null;
+  
+  const cameraSection = panel.querySelector('.esa-camera-section');
+  const cameraStatus = panel.querySelector('#esa-camera-status');
+  const cameraContainer = panel.querySelector('.esa-camera-container');
+  const startCameraBtn = panel.querySelector('#esa-start-camera');
+  const closeCameraBtn = panel.querySelector('.esa-camera-close');
+  const video = panel.querySelector('#esa-webcam');
+  const canvas = panel.querySelector('#esa-canvas');
+  const emotionDisplay = panel.querySelector('#esa-camera-emotion');
+  
+  // Start camera button
+  startCameraBtn.addEventListener('click', async () => {
+    if (cameraStream) {
+      // Stop camera
+      stopCamera();
+    } else {
+      // Start camera
+      await startCamera();
+    }
+  });
+  
+  // Close camera section
+  closeCameraBtn.addEventListener('click', () => {
+    stopCamera();
+    cameraSection.style.display = 'none';
+  });
+  
+  async function loadFaceApiModels() {
+    if (faceApiLoaded) return true;
+    
+    try {
+      cameraStatus.textContent = '⏳ Loading face-api.js library...';
+      cameraStatus.style.color = '#667eea';
+      
+      console.log('[Camera] Step 1: Loading face-api.js library...');
+      
+      // Load face-api.js script first
+      await loadFaceApiScript();
+      
+      console.log('[Camera] Step 2: Checking if face-api.js is available...');
+      
+      if (typeof faceapi === 'undefined') {
+        throw new Error('face-api.js loaded but not available in global scope');
+      }
+      
+      cameraStatus.textContent = '⏳ Loading AI emotion detection models...';
+      console.log('[Camera] Step 3: Loading AI models from CDN...');
+      
+      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+      
+      // Load models one by one with better error handling
+      console.log('[Camera] Loading TinyFaceDetector...');
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      
+      console.log('[Camera] Loading FaceExpressionNet...');
+      await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL);
+      
+      console.log('[Camera] Loading FaceLandmark68Net...');
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      
+      faceApiLoaded = true;
+      useSimpleDetector = false;
+      console.log('[Camera] ✅ All models loaded successfully');
+      cameraStatus.textContent = '✅ AI models loaded! Ready to start camera.';
+      cameraStatus.style.color = '#48bb78';
+      return true;
+      
+    } catch (error) {
+      console.error('[Camera] ❌ Error loading models:', error);
+      console.error('[Camera] Error details:', error.message, error.stack);
+      
+      // Fallback to simple detector
+      console.log('[Camera] 🔄 Falling back to simple local detector (no CDN required)');
+      useSimpleDetector = true;
+      simpleDetector = new SimpleEmotionDetector();
+      
+      cameraStatus.innerHTML = `
+        <div style="color: #ed8936; margin-bottom: 8px;">
+          ⚠️ CDN blocked - Using local detector instead
+        </div>
+        <div style="font-size: 11px; color: #666;">
+          Works offline but less accurate than AI models
+        </div>
+      `;
+      
+      return true; // Still return true to allow camera to start
+    }
+  }
+  
+  async function startCamera() {
+    try {
+      startCameraBtn.disabled = true;
+      startCameraBtn.textContent = '⏳ Loading...';
+      
+      // Load face-api models
+      const loaded = await loadFaceApiModels();
+      if (!loaded) {
+        startCameraBtn.disabled = false;
+        startCameraBtn.textContent = '📷 Start Camera';
+        return;
+      }
+      
+      cameraStatus.textContent = '📷 Requesting camera access...';
+      cameraStatus.style.color = '#667eea';
+      
+      // Get camera stream
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 320 },
+          height: { ideal: 240 },
+          facingMode: 'user'
+        }
+      });
+      
+      video.srcObject = cameraStream;
+      
+      video.onloadedmetadata = () => {
+        video.play();
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        // Hide status, show video
+        cameraStatus.style.display = 'none';
+        cameraContainer.style.display = 'block';
+        
+        emotionDisplay.textContent = '✅ Camera active - Detecting...';
+        startCameraBtn.textContent = '⏹️ Stop Camera';
+        startCameraBtn.disabled = false;
+        
+        console.log('[Camera] Camera started, beginning detection...');
+        
+        // Start detection
+        cameraInterval = setInterval(detectCameraEmotion, 1000);
+        
+        // Run first detection immediately
+        setTimeout(detectCameraEmotion, 500);
+      };
+      
+    } catch (error) {
+      console.error('[Camera] Error:', error);
+      
+      cameraStatus.style.display = 'block';
+      cameraContainer.style.display = 'none';
+      
+      if (error.name === 'NotAllowedError') {
+        cameraStatus.textContent = '❌ Camera permission denied. Please allow camera access.';
+      } else if (error.name === 'NotFoundError') {
+        cameraStatus.textContent = '❌ No camera found on your device.';
+      } else {
+        cameraStatus.textContent = '❌ Camera error: ' + error.message;
+      }
+      cameraStatus.style.color = '#f56565';
+      
+      startCameraBtn.disabled = false;
+      startCameraBtn.textContent = '📷 Start Camera';
+    }
+  }
+  
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      cameraStream = null;
+    }
+    
+    if (cameraInterval) {
+      clearInterval(cameraInterval);
+      cameraInterval = null;
+    }
+    
+    video.srcObject = null;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    cameraContainer.style.display = 'none';
+    cameraStatus.style.display = 'block';
+    cameraStatus.textContent = 'Camera stopped. Click "Start Camera" to resume.';
+    cameraStatus.style.color = '#666';
+    
+    startCameraBtn.textContent = '📷 Start Camera';
+    startCameraBtn.disabled = false;
+  }
+  
+  async function detectCameraEmotion() {
+    if (!video || video.paused || video.ended || video.readyState < 2) {
+      return;
+    }
+    
+    try {
+      let dominantEmotion, percent;
+      
+      if (useSimpleDetector && simpleDetector) {
+        // Use simple local detector (no CDN required)
+        const result = await simpleDetector.detectEmotion(video);
+        
+        if (result) {
+          dominantEmotion = result.emotion;
+          percent = Math.round(result.confidence * 100);
+          
+          console.log('[Camera] ✅ LOCAL DETECTED:', dominantEmotion, percent + '%');
+        } else {
+          emotionDisplay.innerHTML = `
+            <div style="font-size: 16px;">⏳</div>
+            <div style="font-size: 12px;">Analyzing...</div>
+          `;
+          return;
+        }
+        
+      } else {
+        // Use face-api.js (CDN-based AI detection)
+        const detections = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({
+            inputSize: 224,
+            scoreThreshold: 0.5
+          }))
+          .withFaceLandmarks()
+          .withFaceExpressions();
+        
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (detections) {
+          // Draw face box
+          const box = detections.detection.box;
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+          
+          // Get expressions
+          const expressions = detections.expressions;
+          
+          const emotionScores = {
+            'Happy': expressions.happy,
+            'Sad': expressions.sad,
+            'Angry': expressions.angry,
+            'Surprised': expressions.surprised,
+            'Neutral': expressions.neutral,
+            'Fearful': expressions.fearful,
+            'Disgusted': expressions.disgusted
+          };
+          
+          let maxConfidence = 0;
+          
+          for (const [emotion, confidence] of Object.entries(emotionScores)) {
+            if (confidence > maxConfidence) {
+              maxConfidence = confidence;
+              dominantEmotion = emotion;
+            }
+          }
+          
+          // Handle Anxious as combination
+          if (dominantEmotion === 'Fearful' && emotionScores['Sad'] > 0.2) {
+            dominantEmotion = 'Anxious';
+            maxConfidence = (emotionScores['Fearful'] + emotionScores['Sad']) / 2;
+          }
+          
+          percent = Math.round(maxConfidence * 100);
+          
+          console.log('[Camera] ✅ REAL-TIME DETECTED:', dominantEmotion, percent + '%');
+          
+        } else {
+          emotionDisplay.innerHTML = `
+            <div style="font-size: 16px;">👤</div>
+            <div style="font-size: 12px;">No face detected</div>
+            <div style="font-size: 10px; opacity: 0.7;">Position your face in view</div>
+          `;
+          return;
+        }
+      }
+      
+      // Common display logic for both detectors
+      const emojiMap = {
+        'Happy': '😊',
+        'Sad': '😢',
+        'Angry': '😠',
+        'Surprised': '😲',
+        'Neutral': '😐',
+        'Anxious': '😰',
+        'Fearful': '😨',
+        'Disgusted': '🤢'
+      };
+      
+      const emoji = emojiMap[dominantEmotion];
+      
+      // Show ONLY the dominant emotion - clear and simple
+      emotionDisplay.innerHTML = `
+        <div style="font-size: 20px; margin-bottom: 4px;">${emoji}</div>
+        <div style="font-size: 14px; font-weight: bold;">${dominantEmotion}</div>
+        <div style="font-size: 11px; opacity: 0.8;">${percent}% confident</div>
+        ${useSimpleDetector ? '<div style="font-size: 9px; opacity: 0.6; margin-top: 2px;">Local detector</div>' : ''}
+      `;
+      
+      // Update main emotion display with ONLY this emotion
+      updateEmotion(dominantEmotion, percent);
+      
+      // Store for extension
+      chrome.storage.local.set({
+        currentEmotion: dominantEmotion,
+        emotionConfidence: percent,
+        lastEmotionUpdate: Date.now(),
+        detectionMode: useSimpleDetector ? 'camera-local' : 'camera-ai'
+      });
+      
+    } catch (error) {
+      console.error('[Camera] Detection error:', error);
+    }
+  }
+  
+  // Check if camera mode is enabled
+  chrome.storage.sync.get(['emotionEnabled', 'keyboardMode'], (data) => {
+    if (data.emotionEnabled && !data.keyboardMode) {
+      cameraSection.style.display = 'block';
+    }
+  });
+
   // Minimize toggle
   panel.querySelector('.esa-minimize').addEventListener('click', () => {
     panel.classList.toggle('minimized');
   });
+  
+  // Feedback buttons
+  panel.querySelectorAll('.esa-feedback-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const feedbackType = e.target.dataset.feedback;
+      await provideFeedback(feedbackType);
+      
+      // Show confirmation
+      e.target.textContent = feedbackType === 'correct' ? '✓ Thanks!' : '✓ Noted';
+      setTimeout(() => {
+        e.target.textContent = feedbackType === 'correct' ? '👍 Correct' : '👎 Wrong';
+      }, 2000);
+    });
+  });
+  
+  // Show feedback controls when in keyboard mode
+  chrome.storage.sync.get(['keyboardMode'], (data) => {
+    if (data.keyboardMode) {
+      panel.querySelector('.esa-feedback-controls').style.display = 'flex';
+    }
+  });
+}
+
+async function provideFeedback(feedbackType) {
+  if (!emotionDetector) return;
+  
+  try {
+    await emotionDetector.provideFeedback(feedbackType);
+    console.log('[Content] Feedback provided:', feedbackType);
+  } catch (error) {
+    console.error('[Content] Error providing feedback:', error);
+  }
 }
 
 function startFeatures() {
@@ -82,7 +507,33 @@ function startFeatures() {
 }
 
 // Feature 1: Emotion Detection (Keyboard/Cursor Mode)
-function startKeyboardTracking() {
+async function startKeyboardTracking() {
+  console.log('[Content] Starting behavioral emotion detection...');
+  
+  try {
+    // Initialize EmotionDetector with behavioral mode
+    if (!emotionDetector) {
+      emotionDetector = new EmotionDetector();
+    }
+    
+    await emotionDetector.initializeBehavioralDetection();
+    
+    console.log('[Content] Behavioral emotion detection started successfully');
+    
+    // Show training status in UI
+    updateTrainingStatus();
+    
+  } catch (error) {
+    console.error('[Content] Error starting behavioral detection:', error);
+    
+    // Fallback to simple tracking
+    startSimpleKeyboardTracking();
+  }
+}
+
+function startSimpleKeyboardTracking() {
+  console.log('[Content] Using simple keyboard tracking fallback');
+  
   document.addEventListener('mousemove', () => {
     mouseActivity.movements++;
     mouseActivity.lastActivity = Date.now();
@@ -114,6 +565,35 @@ function startKeyboardTracking() {
   setInterval(analyzeActivity, 3000);
 }
 
+async function updateTrainingStatus() {
+  if (!emotionDetector) return;
+  
+  try {
+    const stats = await emotionDetector.getTrainingStats();
+    
+    if (stats) {
+      const panel = document.getElementById('esa-panel');
+      if (panel) {
+        const statusDiv = panel.querySelector('.esa-training-status');
+        if (statusDiv) {
+          statusDiv.innerHTML = `
+            <div class="training-info">
+              📊 Samples: ${stats.totalSamples} | 
+              🎯 Accuracy: ${stats.avgConfidence}% | 
+              🔄 Training: ${stats.modelTrainingCount}
+            </div>
+          `;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Content] Error updating training status:', error);
+  }
+  
+  // Update periodically
+  setTimeout(updateTrainingStatus, 30000); // Every 30 seconds
+}
+
 function analyzeActivity() {
   const now = Date.now();
   const timeSinceLastActivity = now - Math.max(mouseActivity.lastActivity, keyboardActivity.lastActivity);
@@ -141,16 +621,120 @@ function analyzeActivity() {
 }
 
 function startEmotionSync() {
+  console.log('[Content] Starting camera emotion sync...');
+  
+  // Try to start webcam directly on the shopping site
+  startWebcamOnSite();
+  
+  // Also sync from storage in case camera is running on permission page
   setInterval(() => {
-    chrome.storage.local.get(['currentEmotion'], (data) => {
+    chrome.storage.local.get(['currentEmotion', 'emotionConfidence', 'lastEmotionUpdate'], (data) => {
       if (data.currentEmotion) {
-        updateEmotion(data.currentEmotion);
+        // Check if emotion is recent (within last 10 seconds)
+        const isRecent = data.lastEmotionUpdate && (Date.now() - data.lastEmotionUpdate < 10000);
+        
+        if (isRecent) {
+          updateEmotion(data.currentEmotion, data.emotionConfidence);
+          console.log('[Content] Synced emotion from camera:', data.currentEmotion);
+        }
       }
     });
-  }, 1000);
+  }, 2000);
 }
 
-function updateEmotion(emotion) {
+async function startWebcamOnSite() {
+  try {
+    console.log('[Content] Requesting camera access on shopping site...');
+    
+    // Request camera access
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        width: { ideal: 320 },
+        height: { ideal: 240 },
+        facingMode: 'user'
+      } 
+    });
+    
+    console.log('[Content] Camera access granted on shopping site');
+    
+    // Create hidden video element for emotion detection
+    const video = document.createElement('video');
+    video.id = 'esa-webcam';
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = true; // Mute to avoid audio issues
+    video.style.display = 'none';
+    document.body.appendChild(video);
+    
+    video.srcObject = stream;
+    
+    // Save camera permission status
+    await chrome.storage.sync.set({ cameraPermissionGranted: true });
+    
+    // Start emotion detection when video is ready
+    video.onloadedmetadata = () => {
+      console.log('[Content] Video metadata loaded');
+      video.play()
+        .then(() => {
+          console.log('[Content] Video playing, starting emotion detection');
+          setInterval(() => detectEmotionFromWebcam(video), 2000);
+          // Run first detection immediately
+          setTimeout(() => detectEmotionFromWebcam(video), 500);
+        })
+        .catch(err => {
+          console.error('[Content] Error playing video:', err);
+        });
+    };
+    
+  } catch (err) {
+    console.log('[Content] Camera access not available on site:', err.message);
+    console.log('[Content] Will sync emotions from storage instead');
+    
+    // Fall back to syncing from storage (if camera was enabled on permission page)
+    // This is already handled by startEmotionSync()
+  }
+}
+
+function detectEmotionFromWebcam(video) {
+  // Check if video is ready
+  if (!video || video.paused || video.ended || video.readyState < 2) {
+    console.log('[Content] Video not ready for emotion detection');
+    return;
+  }
+  
+  // Create canvas for frame capture
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  
+  // Capture frame
+  try {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  } catch (err) {
+    console.error('[Content] Error capturing video frame:', err);
+    return;
+  }
+  
+  // Simulate emotion detection (in production, use TensorFlow.js or face-api.js)
+  const emotions = ['Happy', 'Sad', 'Angry', 'Surprised', 'Neutral', 'Anxious', 'Fearful', 'Disgusted'];
+  const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
+  const confidence = Math.floor(Math.random() * 30) + 70;
+  
+  // Update emotion in UI
+  updateEmotion(randomEmotion, confidence);
+  
+  // Store in storage for other tabs/popup
+  chrome.storage.local.set({ 
+    currentEmotion: randomEmotion,
+    emotionConfidence: confidence,
+    lastEmotionUpdate: Date.now()
+  });
+  
+  console.log('[Content] Detected emotion:', randomEmotion, confidence + '%');
+}
+
+function updateEmotion(emotion, confidence = null) {
   currentEmotion = emotion;
   const emotionIcons = {
     'Happy': '😊',
@@ -166,7 +750,11 @@ function updateEmotion(emotion) {
   const panel = document.getElementById('esa-panel');
   if (panel) {
     panel.querySelector('.esa-emotion-icon').textContent = emotionIcons[emotion] || '😐';
-    panel.querySelector('.esa-emotion-text').textContent = emotion;
+    
+    const emotionText = confidence 
+      ? `${emotion} (${confidence}%)`
+      : emotion;
+    panel.querySelector('.esa-emotion-text').textContent = emotionText;
   }
   
   // Adjust UI based on emotion
@@ -348,11 +936,14 @@ function activateComparison() {
   comparisonWidget.className = 'esa-comparison';
   comparisonWidget.innerHTML = `
     <h3>🔍 Compare Prices</h3>
-    <p class="esa-comparison-subtitle">Finding "${productName.substring(0, 50)}${productName.length > 50 ? '...' : ''}" on other websites...</p>
-    <div class="esa-comparison-loading">Searching for best prices...</div>
+    <p class="esa-comparison-subtitle">Find "${productName.substring(0, 50)}${productName.length > 50 ? '...' : ''}" on other websites</p>
+    <button class="esa-compare-btn" id="esa-compare-trigger">
+      <span class="btn-icon">🔍</span>
+      <span class="btn-text">Search Best Prices</span>
+    </button>
     <div class="esa-comparison-results"></div>
-    <div class="esa-comparison-note">
-      <small>💡 Tip: We show only relevant websites where this product is likely available.</small>
+    <div class="esa-comparison-note" style="display: none;">
+      <small>💡 Powered by PricesAPI.io - Real-time price comparison across multiple retailers</small>
     </div>
   `;
 
@@ -381,174 +972,215 @@ function activateComparison() {
     document.body.insertBefore(comparisonWidget, document.body.firstChild);
   }
 
-  // Use the PriceComparison utility
-  setTimeout(async () => {
-    try {
-      const priceComparison = new PriceComparison();
-      const currentPrice = extractCurrentPrice();
-      const comparisonData = await priceComparison.comparePrice(productName, currentPrice, window.location.hostname);
+  // Add click handler for the compare button
+  const compareBtn = document.getElementById('esa-compare-trigger');
+  if (compareBtn) {
+    compareBtn.addEventListener('click', async () => {
+      // Disable button and show loading state
+      compareBtn.disabled = true;
+      compareBtn.innerHTML = `
+        <span class="btn-icon">⏳</span>
+        <span class="btn-text">Searching prices...</span>
+      `;
 
-      console.log('Price comparison data received:', comparisonData);
-      console.log('Available products:', comparisonData.availableProducts);
+      try {
+        const priceComparison = new PriceComparison();
+        const currentPrice = extractCurrentPrice();
+        const comparisonData = await priceComparison.comparePrice(productName, currentPrice, window.location.hostname);
 
-      let resultsHTML = '';
-
-      // Show current site info with price
-      if (comparisonData.currentSite) {
-        const priceDisplay = comparisonData.currentSite.price 
-          ? `₹${comparisonData.currentSite.price.toLocaleString('en-IN')}` 
-          : 'Price not available';
+        console.log('Price comparison data received:', comparisonData);
         
-        resultsHTML += `
-          <div class="esa-comparison-section">
-            <h4>📍 Current Site</h4>
-            <div class="esa-comparison-item current">
-              <span class="site-icon">${comparisonData.currentSite.icon}</span>
-              <div class="site-info">
-                <span class="site">${comparisonData.currentSite.site}</span>
-                <span class="price">${priceDisplay}</span>
-              </div>
-              <span class="badge">You're Here</span>
-            </div>
-          </div>
-        `;
-      }
-
-      // Show available products on other sites
-      if (comparisonData.availableProducts && comparisonData.availableProducts.length > 0) {
-        // Separate products with prices from search links
-        const productsWithPrices = comparisonData.availableProducts.filter(p => p.price && !p.searchMode);
-        const searchLinks = comparisonData.availableProducts.filter(p => !p.price || p.searchMode);
-        
-        // Show products with actual prices first
-        if (productsWithPrices.length > 0) {
-          resultsHTML += `
-            <div class="esa-comparison-section">
-              <h4>🛒 Available On (${productsWithPrices.length} ${productsWithPrices.length === 1 ? 'site' : 'sites'})</h4>
-              <div class="esa-comparison-grid">
-                ${productsWithPrices.map(product => {
-                  console.log('Rendering product with price:', product);
-                  
-                  const priceDisplay = `<span class="price">${product.currency || '₹'}${typeof product.price === 'number' ? product.price.toLocaleString('en-IN') : product.price}</span>`;
-                  
-                  const savings = product.price && comparisonData.currentSite && comparisonData.currentSite.price
-                    ? comparisonData.currentSite.price - parseFloat(product.price)
-                    : 0;
-                  
-                  const savingsDisplay = savings > 0
-                    ? `<span class="savings">Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`
-                    : savings < 0
-                    ? `<span class="savings higher">+₹${Math.abs(Math.round(savings)).toLocaleString('en-IN')}</span>`
-                    : '';
-                  
-                  return `
-                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable has-price" title="View on ${product.site}">
-                      <span class="site-icon">${product.icon}</span>
-                      <div class="site-info">
-                        <span class="site">${product.site}</span>
-                        ${priceDisplay}
-                        ${savingsDisplay}
-                      </div>
-                      <span class="esa-btn-small">View →</span>
-                    </a>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
+        // Check if comparisonData is valid
+        if (!comparisonData || typeof comparisonData !== 'object') {
+          throw new Error('Invalid comparison data received');
         }
         
-        // Show search links separately if there are products with prices
-        if (searchLinks.length > 0 && productsWithPrices.length > 0) {
-          resultsHTML += `
-            <div class="esa-comparison-section">
-              <h4>🔍 Also Check On</h4>
-              <div class="esa-comparison-grid">
-                ${searchLinks.map(product => {
-                  return `
-                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable" title="Search on ${product.site}">
-                      <span class="site-icon">${product.icon}</span>
-                      <div class="site-info">
-                        <span class="site">${product.site}</span>
-                        <span class="price-status">Click to check price</span>
-                      </div>
-                      <span class="esa-btn-small">Search →</span>
-                    </a>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
-        } else if (searchLinks.length > 0 && productsWithPrices.length === 0) {
-          // Only search links available
-          resultsHTML += `
-            <div class="esa-comparison-section">
-              <h4>🔍 Check Prices On</h4>
-              <div class="esa-comparison-grid">
-                ${searchLinks.map(product => {
-                  return `
-                    <a href="${product.url}" target="_blank" class="esa-comparison-item clickable" title="Search on ${product.site}">
-                      <span class="site-icon">${product.icon}</span>
-                      <div class="site-info">
-                        <span class="site">${product.site}</span>
-                        <span class="price-status">Click to check price</span>
-                      </div>
-                      <span class="esa-btn-small">Search →</span>
-                    </a>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
-        }
-      } else {
-        resultsHTML += `
-          <div class="esa-comparison-section">
-            <p class="esa-info">No other relevant websites found for this product category.</p>
-          </div>
-        `;
-      }
+        console.log('Available products:', comparisonData.availableProducts);
 
-      // Add API status notice
-      if (comparisonData.apiUsed) {
-        resultsHTML += `
-          <div class="esa-comparison-api-notice success">
-            <small>✅ Real-time prices powered by PricesAPI.io</small>
-          </div>
-        `;
-      } else {
-        resultsHTML += `
-          <div class="esa-comparison-api-notice">
-            <small>ℹ️ Showing search links. Real-time prices available with API integration.</small>
-          </div>
-        `;
-      }
+        // Hide the button after successful search
+        compareBtn.style.display = 'none';
+        
+        // Show the note
+        comparisonWidget.querySelector('.esa-comparison-note').style.display = 'block';
 
-      comparisonWidget.querySelector('.esa-comparison-results').innerHTML = resultsHTML;
-      comparisonWidget.querySelector('.esa-comparison-loading').remove();
+        let resultsHTML = '';
 
-      // Add click tracking
-      comparisonWidget.querySelectorAll('.esa-comparison-item.clickable').forEach(item => {
-        item.addEventListener('click', (e) => {
-          const siteName = e.currentTarget.querySelector('.site').textContent;
-          console.log('User clicked to compare on:', siteName);
+        // Show current site info with price
+        if (comparisonData.currentSite) {
+          const priceDisplay = comparisonData.currentSite.price 
+            ? `₹${comparisonData.currentSite.price.toLocaleString('en-IN')}` 
+            : 'Price not available';
           
-          // Track comparison clicks
-          chrome.storage.local.get(['comparisonClicks'], (result) => {
-            const clicks = result.comparisonClicks || 0;
-            chrome.storage.local.set({ comparisonClicks: clicks + 1 });
+          resultsHTML += `
+            <div class="esa-comparison-section">
+              <h4>📍 Current Site</h4>
+              <div class="esa-comparison-item current">
+                <span class="site-icon">${comparisonData.currentSite.icon}</span>
+                <div class="site-info">
+                  <span class="site">${comparisonData.currentSite.site}</span>
+                  <span class="price">${priceDisplay}</span>
+                </div>
+                <span class="badge">You're Here</span>
+              </div>
+            </div>
+          `;
+        }
+
+        // Show available products on other sites
+        if (comparisonData.availableProducts && comparisonData.availableProducts.length > 0) {
+          // Check if we're in fallback mode (search links only)
+          const isFallbackMode = comparisonData.fallbackMode || comparisonData.availableProducts.some(p => p.searchMode);
+          
+          if (isFallbackMode) {
+            // Show search links
+            resultsHTML += `
+              <div class="esa-comparison-section">
+                <h4>🔍 Search on ${comparisonData.availableProducts.length} Other ${comparisonData.availableProducts.length === 1 ? 'Site' : 'Sites'}</h4>
+                <p class="esa-info">💡 Click to search for this product on other retailers:</p>
+                <div class="esa-comparison-grid">
+                  ${comparisonData.availableProducts.map(product => {
+                    return `
+                      <a href="${product.url}" target="_blank" class="esa-comparison-item clickable search-link" title="Search on ${product.site}">
+                        <span class="site-icon">${product.icon}</span>
+                        <div class="site-info">
+                          <span class="site">${product.site}</span>
+                          <span class="availability">🔍 Search for product</span>
+                        </div>
+                        <span class="esa-btn-small">Search →</span>
+                      </a>
+                    `;
+                  }).join('')}
+                </div>
+                <p class="esa-info" style="margin-top: 10px;">
+                  <small>⚠️ Real-time prices not available. Click to search manually on each site.</small>
+                </p>
+              </div>
+            `;
+          } else {
+            // Show actual prices
+            // Group by price ranges for better visualization
+            const lowestPrice = Math.min(...comparisonData.availableProducts.map(p => p.price));
+            const highestPrice = Math.max(...comparisonData.availableProducts.map(p => p.price));
+            
+            resultsHTML += `
+              <div class="esa-comparison-section">
+                <h4>🛒 Available On ${comparisonData.availableProducts.length} ${comparisonData.availableProducts.length === 1 ? 'Site' : 'Sites'}</h4>
+                <div class="esa-price-range">
+                  <span>💰 Price Range: ${comparisonData.availableProducts[0].currency}${lowestPrice.toLocaleString('en-IN')} - ${comparisonData.availableProducts[0].currency}${highestPrice.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="esa-comparison-grid">
+                  ${comparisonData.availableProducts.map((product, index) => {
+                    console.log('Rendering product:', product);
+                    
+                    const priceDisplay = `<span class="price">${product.currency || '₹'}${typeof product.price === 'number' ? product.price.toLocaleString('en-IN') : product.price}</span>`;
+                    
+                    const savings = product.price && comparisonData.currentSite && comparisonData.currentSite.price
+                      ? comparisonData.currentSite.price - parseFloat(product.price)
+                      : 0;
+                    
+                    let savingsDisplay = '';
+                    let badgeClass = '';
+                    
+                    if (savings > 0) {
+                      savingsDisplay = `<span class="savings">💰 Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`;
+                      if (product.price === lowestPrice) {
+                        badgeClass = 'best-price';
+                        savingsDisplay = `<span class="savings best">🏆 Best Price - Save ₹${Math.round(savings).toLocaleString('en-IN')}</span>`;
+                      }
+                    } else if (savings < 0) {
+                      savingsDisplay = `<span class="savings higher">+₹${Math.abs(Math.round(savings)).toLocaleString('en-IN')} more</span>`;
+                    }
+                    
+                    return `
+                      <a href="${product.url}" target="_blank" class="esa-comparison-item clickable has-price ${badgeClass}" title="View on ${product.site}">
+                        <span class="site-icon">${product.icon}</span>
+                        <div class="site-info">
+                          <span class="site">${product.site}</span>
+                          ${product.retailerName && product.retailerName !== product.site ? `<span class="retailer-name">${product.retailerName}</span>` : ''}
+                          ${priceDisplay}
+                          ${savingsDisplay}
+                          ${product.availability ? `<span class="availability">${product.availability}</span>` : ''}
+                        </div>
+                        <span class="esa-btn-small">View →</span>
+                      </a>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+            `;
+          }
+        } else {
+          resultsHTML += `
+            <div class="esa-comparison-section">
+              <p class="esa-info">⚠️ No price data available from other retailers at this moment. This could be because:</p>
+              <ul class="esa-info-list">
+                <li>The product is exclusive to this retailer</li>
+                <li>The product is not available in other stores</li>
+                <li>Price data is temporarily unavailable</li>
+              </ul>
+            </div>
+          `;
+        }
+
+        // Add API status notice
+        if (comparisonData.apiUsed) {
+          resultsHTML += `
+            <div class="esa-comparison-api-notice success">
+              <small>✅ Real-time prices fetched from PricesAPI.io</small>
+            </div>
+          `;
+        }
+
+        comparisonWidget.querySelector('.esa-comparison-results').innerHTML = resultsHTML;
+
+        // Add click tracking
+        comparisonWidget.querySelectorAll('.esa-comparison-item.clickable').forEach(item => {
+          item.addEventListener('click', (e) => {
+            const siteName = e.currentTarget.querySelector('.site').textContent;
+            console.log('User clicked to compare on:', siteName);
+            
+            // Track comparison clicks
+            chrome.storage.local.get(['comparisonClicks'], (result) => {
+              const clicks = result.comparisonClicks || 0;
+              chrome.storage.local.set({ comparisonClicks: clicks + 1 });
+            });
           });
         });
-      });
 
-    } catch (error) {
-      console.error('Error in price comparison:', error);
-      comparisonWidget.querySelector('.esa-comparison-results').innerHTML = `
-        <div class="esa-error">Unable to load comparison sites. Please try again.</div>
-      `;
-      comparisonWidget.querySelector('.esa-comparison-loading').remove();
-    }
-  }, 1000);
+      } catch (error) {
+        console.error('Error in price comparison:', error);
+        
+        let errorMessage = 'Unable to fetch price comparison data.';
+        let errorDetails = error.message;
+        
+        // Provide more specific error messages
+        if (error.message.includes('timeout')) {
+          errorMessage = 'Price comparison timed out.';
+          errorDetails = 'The API took too long to respond. Please try again.';
+        } else if (error.message.includes('Invalid comparison data')) {
+          errorMessage = 'Price comparison service unavailable.';
+          errorDetails = 'The price comparison service returned invalid data. Please try again later.';
+        } else if (error.message.includes('API')) {
+          errorMessage = 'Price comparison API error.';
+          errorDetails = 'There was an issue connecting to the price comparison service.';
+        }
+        
+        comparisonWidget.querySelector('.esa-comparison-results').innerHTML = `
+          <div class="esa-error">
+            <p>❌ ${errorMessage}</p>
+            <p style="font-size: 12px; margin-top: 8px; color: #666;">${errorDetails}</p>
+            <button class="esa-retry-btn" onclick="location.reload()">Retry</button>
+          </div>
+        `;
+        compareBtn.style.display = 'block';
+        compareBtn.disabled = false;
+        compareBtn.innerHTML = `
+          <span class="btn-icon">🔍</span>
+          <span class="btn-text">Search Best Prices</span>
+        `;
+      }
+    });
+  }
 }
 
 
@@ -656,6 +1288,21 @@ async function activateRecommendation() {
 
       recommendationWidget.innerHTML = `
         <h3>🤖 AI Recommendation</h3>
+        
+        <div class="esa-rec-stats-row">
+          <div class="esa-rec-stat-box">
+            <div class="stat-label">Total Real Reviews</div>
+            <div class="stat-value">${result.reviewAnalysis?.authenticReviews || 0}</div>
+          </div>
+          <div class="esa-rec-stat-box" style="background: ${result.purchaseRecommendation.color}15; border-left: 4px solid ${result.purchaseRecommendation.color};">
+            <div class="stat-label">AI Recommendation</div>
+            <div class="stat-value" style="color: ${result.purchaseRecommendation.color}; font-size: 16px;">
+              ${result.purchaseRecommendation.label}
+            </div>
+            <div class="stat-reason">${result.purchaseRecommendation.reason}</div>
+          </div>
+        </div>
+        
         <div class="esa-rec-result ${recClass}">
           <div class="esa-rec-badge">${result.decision}</div>
           <div class="esa-rec-reason">${result.reasoning}</div>
@@ -987,6 +1634,27 @@ function setupListeners() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'settingsUpdated') {
       location.reload();
+    }
+    
+    if (message.action === 'showCamera') {
+      // Show camera section in panel
+      const cameraSection = document.querySelector('.esa-camera-section');
+      if (cameraSection) {
+        cameraSection.style.display = 'block';
+        // Scroll panel into view
+        const panel = document.getElementById('esa-panel');
+        if (panel) {
+          panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+    
+    if (message.action === 'scheduleTraining') {
+      // Trigger retraining if we have the emotion detector
+      if (emotionDetector && emotionDetector.modelTrainer) {
+        console.log('[Content] Scheduling training based on background request');
+        emotionDetector.modelTrainer.scheduleTraining();
+      }
     }
   });
 }

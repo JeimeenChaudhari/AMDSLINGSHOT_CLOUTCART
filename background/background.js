@@ -1,4 +1,7 @@
 // Background service worker
+// Import training scheduler
+importScripts('training-scheduler.js');
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('Emotion-Adaptive Shopping Assistant installed');
   
@@ -69,6 +72,70 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         { site: 'Target', price: message.currentPrice * 0.92 }
       ]
     });
+  }
+  
+  // Handle PricesAPI requests to avoid CORS issues
+  if (message.action === 'pricesApiSearch') {
+    const { productName, country, limit, apiKey } = message;
+    const searchLimit = limit || 10; // Default to 10 if not specified
+    const searchUrl = `https://api.pricesapi.io/api/v1/products/search?q=${encodeURIComponent(productName)}&limit=${searchLimit}&country=${country || 'in'}&api_key=${apiKey}`;
+    
+    fetch(searchUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(err => {
+          throw new Error(JSON.stringify(err));
+        }).catch(() => {
+          throw new Error(`HTTP ${response.status}`);
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      sendResponse({ success: true, data: data });
+    })
+    .catch(error => {
+      console.error('PricesAPI search error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    
+    return true; // Keep channel open for async response
+  }
+  
+  if (message.action === 'pricesApiOffers') {
+    const { productId, country, apiKey } = message;
+    const offersUrl = `https://api.pricesapi.io/api/v1/products/${productId}/offers?country=${country || 'in'}&api_key=${apiKey}`;
+    
+    fetch(offersUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(err => {
+          throw new Error(JSON.stringify(err));
+        }).catch(() => {
+          throw new Error(`HTTP ${response.status}`);
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      sendResponse({ success: true, data: data });
+    })
+    .catch(error => {
+      console.error('PricesAPI offers error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    
+    return true; // Keep channel open for async response
   }
   
   return true;

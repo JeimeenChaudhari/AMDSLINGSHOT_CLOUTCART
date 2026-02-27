@@ -64,6 +64,12 @@
         "*://*.indiamart.com/*"
       ],
       "js": [
+        "models/simple-emotion-detector.js",
+        "models/behavioral-data-collector.js",
+        "models/feature-extractor.js",
+        "models/emotion-ml-model.js",
+        "utils/training-data-manager.js",
+        "utils/model-trainer.js",
         "models/emotion-detection.js",
         "utils/review-analyzer.js",
         "utils/ai-recommendation-engine.js",
@@ -77,7 +83,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["models/*", "icons/*"],
+      "resources": ["models/*", "icons/*", "camera-permission.html", "camera-permission.js"],
       "matches": ["<all_urls>"]
     }
   ],

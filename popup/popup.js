@@ -1,6 +1,4 @@
-// Popup controller
-let stream = null;
-let emotionInterval = null;
+// Popup controller - Camera access moved to dedicated page
 
 // Load saved settings
 chrome.storage.sync.get([
@@ -12,7 +10,8 @@ chrome.storage.sync.get([
   'recommendation',
   'reviewChecker',
   'moneySaved',
-  'productsAnalyzed'
+  'productsAnalyzed',
+  'cameraPermissionGranted'
 ], (data) => {
   document.getElementById('emotionToggle').checked = data.emotionEnabled || false;
   document.getElementById('keyboardMode').checked = data.keyboardMode || false;
@@ -25,9 +24,11 @@ chrome.storage.sync.get([
   document.getElementById('moneySaved').textContent = `$${data.moneySaved || 0}`;
   document.getElementById('productsAnalyzed').textContent = data.productsAnalyzed || 0;
   
-  if (data.emotionEnabled && !data.keyboardMode) {
-    startWebcam();
+  // Show camera notice if emotion is enabled but not in keyboard mode
+  if (data.emotionEnabled && !data.keyboardMode && !data.cameraPermissionGranted) {
+    document.getElementById('cameraNotice').style.display = 'block';
   }
+  
   updateEmotionStatus();
 });
 
@@ -38,28 +39,56 @@ document.getElementById('emotionToggle').addEventListener('change', async (e) =>
   if (enabled) {
     const keyboardMode = document.getElementById('keyboardMode').checked;
     if (!keyboardMode) {
-      // Show camera notice with button
+      // Show camera notice with button to open permission page
       document.getElementById('cameraNotice').style.display = 'block';
     } else {
       await chrome.storage.sync.set({ emotionEnabled: enabled });
+      updateEmotionStatus();
     }
   } else {
-    stopWebcam();
     document.getElementById('cameraNotice').style.display = 'none';
     await chrome.storage.sync.set({ emotionEnabled: false });
+    updateEmotionStatus();
   }
   
-  updateEmotionStatus();
   notifyContentScript();
 });
 
 // Camera request button
 document.getElementById('requestCameraBtn').addEventListener('click', async () => {
   console.log('Camera button clicked');
-  await startWebcam();
-  if (stream) {
-    await chrome.storage.sync.set({ emotionEnabled: true });
-  }
+  
+  // Enable emotion detection and camera mode
+  await chrome.storage.sync.set({ 
+    emotionEnabled: true,
+    keyboardMode: false 
+  });
+  
+  // Notify content script to show camera section
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, { 
+        action: 'showCamera' 
+      });
+    }
+  });
+  
+  // Update UI
+  document.getElementById('emotionToggle').checked = true;
+  document.getElementById('keyboardMode').checked = false;
+  document.getElementById('cameraNotice').style.display = 'none';
+  updateEmotionStatus();
+  
+  // Show success message
+  const notice = document.getElementById('cameraNotice');
+  notice.style.display = 'block';
+  notice.style.background = '#e8f5e9';
+  notice.style.color = '#388e3c';
+  notice.innerHTML = '<p style="margin: 0;">✅ Camera mode enabled! Check the shopping page for the camera panel.</p>';
+  
+  setTimeout(() => {
+    notice.style.display = 'none';
+  }, 3000);
 });
 
 // Show camera notice when hovering over emotion toggle
@@ -86,14 +115,47 @@ document.getElementById('keyboardMode').addEventListener('change', async (e) => 
   await chrome.storage.sync.set({ keyboardMode });
   
   if (keyboardMode) {
-    stopWebcam();
     document.getElementById('cameraNotice').style.display = 'none';
-  } else if (document.getElementById('emotionToggle').checked) {
-    document.getElementById('cameraNotice').style.display = 'block';
-    await startWebcam();
+    if (document.getElementById('emotionToggle').checked) {
+      await chrome.storage.sync.set({ emotionEnabled: true });
+    }
+    
+    // Show training stats
+    document.getElementById('trainingStats').style.display = 'block';
+    updateTrainingStats();
+  } else {
+    document.getElementById('trainingStats').style.display = 'none';
+    if (document.getElementById('emotionToggle').checked) {
+      document.getElementById('cameraNotice').style.display = 'block';
+    }
   }
+  
+  updateEmotionStatus();
   notifyContentScript();
 });
+
+// Update training stats
+async function updateTrainingStats() {
+  try {
+    const result = await chrome.storage.local.get(['trainingStats']);
+    
+    if (result.trainingStats) {
+      const stats = result.trainingStats;
+      document.getElementById('trainingSamples').textContent = stats.totalSamples || 0;
+      document.getElementById('modelAccuracy').textContent = stats.avgConfidence || 0;
+      document.getElementById('trainingCount').textContent = stats.lastTrainingSampleCount || 0;
+    }
+  } catch (error) {
+    console.error('Error loading training stats:', error);
+  }
+}
+
+// Update stats periodically when keyboard mode is active
+setInterval(() => {
+  if (document.getElementById('keyboardMode').checked) {
+    updateTrainingStats();
+  }
+}, 5000);
 
 // Feature toggles
 const features = ['focusMode', 'priceHistory', 'comparison', 'recommendation', 'reviewChecker'];
@@ -110,139 +172,13 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
   location.reload();
 });
 
-async function startWebcam() {
-  try {
-    // Check if getUserMedia is available
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      showCameraNotSupportedMessage();
-      return;
-    }
-    
-    // Request camera access - this will trigger the browser's permission prompt
-    stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { 
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: 'user'
-      } 
-    });
-    
-    console.log('Camera access granted');
-    
-    const video = document.getElementById('webcam');
-    if (!video) {
-      throw new Error('Video element not found');
-    }
-    
-    video.srcObject = stream;
-    document.getElementById('emotionDisplay').classList.remove('hidden');
-    document.getElementById('cameraNotice').style.display = 'none';
-    
-    // Start emotion detection after video is ready
-    video.onloadedmetadata = () => {
-      video.play().then(() => {
-        emotionInterval = setInterval(() => detectEmotion(), 1000);
-      }).catch(err => {
-        console.warn('Video playback error:', err.message);
-        handleCameraError(err);
-      });
-    };
-    
-    // Also handle if metadata is already loaded
-    if (video.readyState >= 2) {
-      video.play().then(() => {
-        emotionInterval = setInterval(() => detectEmotion(), 1000);
-      }).catch(err => {
-        console.warn('Video playback error:', err.message);
-        handleCameraError(err);
-      });
-    }
-    
-  } catch (err) {
-    // Handle camera errors silently in console, show user-friendly message
-    handleCameraError(err);
-  }
-}
-
-function showCameraNotSupportedMessage() {
-  const message = 'Camera access is not supported in extension popups.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
-  alert(message);
-  document.getElementById('emotionToggle').checked = false;
-  chrome.storage.sync.set({ emotionEnabled: false });
-  document.getElementById('cameraNotice').style.display = 'none';
-}
-
-async function handleCameraError(err) {
-  let errorMessage = '';
-  
-  if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-    errorMessage = 'Camera permission was denied or dismissed.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
-  } else if (err.name === 'NotFoundError') {
-    errorMessage = 'No camera found on your device.\n\nPlease enable "Keyboard Mode" to use emotion detection without a camera.';
-  } else if (err.name === 'NotReadableError') {
-    errorMessage = 'Camera is already in use by another application.\n\nPlease close other apps using the camera, or enable "Keyboard Mode" instead.';
-  } else if (err.name === 'NotSupportedError') {
-    errorMessage = 'Camera access is not supported in this context.\n\nPlease enable "Keyboard Mode" instead.';
-  } else {
-    // Generic error - likely security restriction in extension popup
-    errorMessage = 'Camera access is not available in extension popups.\n\nPlease enable "Keyboard Mode" instead, which detects emotions from your browsing behavior without requiring camera access.';
-  }
-  
-  alert(errorMessage);
-  
-  // Disable emotion detection if camera fails
-  document.getElementById('emotionToggle').checked = false;
-  await chrome.storage.sync.set({ emotionEnabled: false });
-  document.getElementById('cameraNotice').style.display = 'none';
-}
-
-
-
-function stopWebcam() {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-    stream = null;
-  }
-  if (emotionInterval) {
-    clearInterval(emotionInterval);
-    emotionInterval = null;
-  }
-  document.getElementById('emotionDisplay').classList.add('hidden');
-}
-
-function detectEmotion() {
-  const video = document.getElementById('webcam');
-  const canvas = document.getElementById('emotionCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video, 0, 0);
-  
-  // Simulate emotion detection (in production, use TensorFlow.js or face-api.js)
-  const emotions = ['Happy', 'Sad', 'Angry', 'Surprised', 'Neutral', 'Anxious', 'Fearful', 'Disgusted'];
-  const emotionIcons = ['😊', '😢', '😠', '😲', '😐', '😰', '😨', '🤢'];
-  const randomIndex = Math.floor(Math.random() * emotions.length);
-  const confidence = Math.floor(Math.random() * 30) + 70;
-  
-  document.querySelector('.emotion-icon').textContent = emotionIcons[randomIndex];
-  document.querySelector('.emotion-text').textContent = emotions[randomIndex];
-  document.querySelector('.emotion-confidence').textContent = `Confidence: ${confidence}%`;
-  
-  // Store current emotion
-  chrome.storage.local.set({ 
-    currentEmotion: emotions[randomIndex],
-    emotionConfidence: confidence
-  });
-}
-
 function updateEmotionStatus() {
   const enabled = document.getElementById('emotionToggle').checked;
   const keyboardMode = document.getElementById('keyboardMode').checked;
   const status = document.getElementById('emotionStatus');
   
   if (enabled) {
-    status.textContent = keyboardMode ? 'Keyboard Mode' : 'Webcam Active';
+    status.textContent = keyboardMode ? 'Keyboard Mode' : 'Camera Mode';
     status.style.color = '#4caf50';
   } else {
     status.textContent = 'Disabled';
@@ -257,8 +193,3 @@ function notifyContentScript() {
     }
   });
 }
-
-// Cleanup on close
-window.addEventListener('beforeunload', () => {
-  stopWebcam();
-});

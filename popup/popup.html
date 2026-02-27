@@ -25,9 +25,10 @@
       
       <div class="camera-permission-notice" style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px; display: none;" id="cameraNotice">
         <strong>📷 Camera Access Required</strong>
-        <p style="margin: 5px 0;">Click the button below to grant camera permission.</p>
+        <p style="margin: 5px 0;">When you visit a shopping site, your browser will ask for camera permission. Click "Allow" to enable emotion detection.</p>
+        <p style="margin: 5px 0; font-size: 11px; color: #666;">Or click below to grant permission now:</p>
         <button id="requestCameraBtn" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 5px;">
-          Enable Camera
+          Enable Camera Now
         </button>
       </div>
       
@@ -46,6 +47,11 @@
           Use Keyboard/Cursor Mode (No Webcam)
         </label>
         <p style="font-size: 11px; color: #666; margin: 5px 0 0 20px;">Detects emotions from your browsing behavior without camera access</p>
+        <div id="trainingStats" class="training-stats" style="display: none; margin: 10px 0 0 20px; font-size: 11px; color: #555;">
+          <div>📊 Training Samples: <span id="trainingSamples">0</span></div>
+          <div>🎯 Model Accuracy: <span id="modelAccuracy">0</span>%</div>
+          <div>🔄 Training Count: <span id="trainingCount">0</span></div>
+        </div>
       </div>
     </section>
 
