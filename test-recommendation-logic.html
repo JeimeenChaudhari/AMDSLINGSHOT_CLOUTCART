@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Recommendation Logic</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .test-case {
+      background: white;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-case h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .result.BUY {
+      background: #e8f5e9;
+      border-left: 4px solid #4caf50;
+    }
+    .result.WAIT {
+      background: #fff3e0;
+      border-left: 4px solid #ff9800;
+    }
+    .result.AVOID {
+      background: #ffebee;
+      border-left: 4px solid #f44336;
+    }
+    .factors {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 AI Recommendation Logic Test</h1>
+  <div id="results"></div>
+
+  <script src="utils/ai-recommendation-engine.js"></script>
+  <script>
+    const aiEngine = new AIRecommendationEngine();
+    const resultsDiv = document.getElementById('results');
+
+    // Test cases
+    const testCases = [
+      {
+        name: "High Quality Product - Good Reviews",
+        productData: {
+          rating: 4.5,
+          reviewCount: 100,
+          currentPrice: 500,
+          historicalPrice: [600, 650, 700]
+        },
+        emotion: "Happy",
+        reviews: createMockReviews(20, 0.9, 0.8) // 90% authentic, 80% verified
+      },
+      {
+        name: "Suspicious Product - Many Fake Reviews",
+        productData: {
+          rating: 4.8,
+          reviewCount: 50,
+          currentPrice: 300,
+          historicalPrice: [350, 400]
+        },
+        emotion: "Neutral",
+        reviews: createMockReviews(20, 0.3, 0.2) // 30% authentic, 20% verified
+      },
+      {
+        name: "Moderate Product - Mixed Reviews",
+        productData: {
+          rating: 3.8,
+          reviewCount: 75,
+          currentPrice: 800,
+          historicalPrice: [750, 780]
+        },
+        emotion: "Neutral",
+        reviews: createMockReviews(20, 0.6, 0.5) // 60% authentic, 50% verified
+      },
+      {
+        name: "Good Product - Impulsive Buyer",
+        productData: {
+          rating: 4.3,
+          reviewCount: 120,
+          currentPrice: 400,
+          historicalPrice: [500, 550]
+        },
+        emotion: "Excited",
+        reviews: createMockReviews(20, 0.85, 0.75),
+        behaviorData: {
+          clicks: 25,
+          timeSpent: 15000,
+          scrolls: 10
+        }
+      }
+    ];
+
+    // Create mock reviews
+    function createMockReviews(count, authenticRatio, verifiedRatio) {
+      const reviews = [];
+      for (let i = 0; i < count; i++) {
+        const isAuthentic = Math.random() < authenticRatio;
+        const isVerified = Math.random() < verifiedRatio;
+        
+        const review = document.createElement('div');
+        review.className = 'review';
+        
+        if (isAuthentic) {
+          review.textContent = `This is a genuine review with detailed feedback about the product. ${isVerified ? 'Verified Purchase' : ''} I've been using this for a few weeks and it works well for my needs.`;
+        } else {
+          review.textContent = `AMAZING BEST PRODUCT EVER!!! BUY NOW!!! ${isVerified ? 'Verified Purchase' : ''}`;
+        }
+        
+        reviews.push(review);
+      }
+      return reviews;
+    }
+
+    // Run tests
+    async function runTests() {
+      for (const testCase of testCases) {
+        const result = await aiEngine.generateRecommendation(
+          testCase.productData,
+          testCase.emotion,
+          testCase.behaviorData || { clicks: 5, timeSpent: 60000, scrolls: 10 },
+          testCase.reviews
+        );
+
+        const testDiv = document.createElement('div');
+        testDiv.className = 'test-case';
+        testDiv.innerHTML = `
+          <h3>${testCase.name}</h3>
+          <div class="result ${result.decision}">
+            <strong>Decision: ${result.decision}</strong> (Confidence: ${result.confidence}%)
+          </div>
+          <div><strong>Reasoning:</strong> ${result.reasoning}</div>
+          <div class="factors">
+            <strong>Factors:</strong><br>
+            • Review Trustworthiness: ${(result.factors.reviewTrustworthiness * 100).toFixed(1)}%<br>
+            • Fake Review Risk: ${(result.factors.fakeReviewRisk * 100).toFixed(1)}%<br>
+            • Emotional Stability: ${(result.factors.emotionalStability * 100).toFixed(1)}%<br>
+            • Price Advantage: ${(result.factors.priceAdvantage * 100).toFixed(1)}%<br>
+            • Rating Consistency: ${(result.factors.ratingConsistency * 100).toFixed(1)}%<br>
+            • Authentic Reviews: ${result.reviewAnalysis.authenticReviews}/${testCase.reviews.length}<br>
+            • Purchase Rec: ${result.purchaseRecommendation.label}
+          </div>
+        `;
+        resultsDiv.appendChild(testDiv);
+      }
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

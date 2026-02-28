@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Price History Engine Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+
+    .test-section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .test-section h2 {
+      margin-top: 0;
+      color: #667eea;
+    }
+
+    .product-card {
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      background: #fafafa;
+    }
+
+    .product-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+
+    .product-price {
+      font-size: 24px;
+      font-weight: bold;
+      color: #e91e63;
+      margin-bottom: 12px;
+    }
+
+    .product-url {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+
+    button:hover {
+      background: #5568d3;
+    }
+
+    button.secondary {
+      background: #95a5a6;
+    }
+
+    button.secondary:hover {
+      background: #7f8c8d;
+    }
+
+    .log {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 16px;
+    }
+
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 4px 0;
+      border-bottom: 1px solid #34495e;
+    }
+
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: #95a5a6;
+      margin-right: 8px;
+    }
+
+    .log-success {
+      color: #2ecc71;
+    }
+
+    .log-error {
+      color: #e74c3c;
+    }
+
+    .log-info {
+      color: #3498db;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .stat-card {
+      background: #f8f9fa;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #667eea;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>💰 Price History Engine Test Suite</h1>
+    <p>Test the price tracking, analytics, and visualization features</p>
+  </div>
+
+  <div class="test-section">
+    <h2>📦 Sample Products</h2>
+    
+    <div class="product-card">
+      <div class="product-title">Sony WH-1000XM5 Wireless Headphones</div>
+      <div class="product-price">$399.99</div>
+      <div class="product-url">https://www.amazon.com/dp/B09XS7JWHH</div>
+      <button onclick="trackPrice('amazon', 'B09XS7JWHH', 399.99, 'Sony WH-1000XM5')">Track Price</button>
+      <button onclick="showHistory('amazon', 'B09XS7JWHH', 399.99, 'Sony WH-1000XM5')">Show History</button>
+      <button onclick="addButton('amazon', 'B09XS7JWHH', 399.99, 'Sony WH-1000XM5')" class="secondary">Add Button</button>
+    </div>
+
+    <div class="product-card">
+      <div class="product-title">Apple AirPods Pro (2nd Generation)</div>
+      <div class="product-price">$249.00</div>
+      <div class="product-url">https://www.amazon.com/dp/B0CHWRXH8B</div>
+      <button onclick="trackPrice('amazon', 'B0CHWRXH8B', 249.00, 'Apple AirPods Pro')">Track Price</button>
+      <button onclick="showHistory('amazon', 'B0CHWRXH8B', 249.00, 'Apple AirPods Pro')">Show History</button>
+      <button onclick="addButton('amazon', 'B0CHWRXH8B', 249.00, 'Apple AirPods Pro')" class="secondary">Add Button</button>
+    </div>
+
+    <div class="product-card">
+      <div class="product-title">Samsung Galaxy S24 Ultra</div>
+      <div class="product-price">$1,299.99</div>
+      <div class="product-url">https://www.walmart.com/ip/Samsung-Galaxy-S24-Ultra/12345678</div>
+      <button onclick="trackPrice('walmart', '12345678', 1299.99, 'Samsung Galaxy S24 Ultra')">Track Price</button>
+      <button onclick="showHistory('walmart', '12345678', 1299.99, 'Samsung Galaxy S24 Ultra')">Show History</button>
+      <button onclick="addButton('walmart', '12345678', 1299.99, 'Samsung Galaxy S24 Ultra')" class="secondary">Add Button</button>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>🧪 Test Actions</h2>
+    <button onclick="testSimulatedData()">Generate Simulated Data</button>
+    <button onclick="testAnalytics()">Test Analytics Engine</button>
+    <button onclick="testMultipleSnapshots()">Add Multiple Snapshots</button>
+    <button onclick="viewStoredData()">View Stored Data</button>
+    <button onclick="clearAllData()" class="secondary">Clear All Data</button>
+    <button onclick="performMaintenance()" class="secondary">Run Maintenance</button>
+  </div>
+
+  <div class="test-section">
+    <h2>📊 Statistics</h2>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Products Tracked</div>
+        <div class="stat-value" id="productsTracked">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Snapshots</div>
+        <div class="stat-value" id="totalSnapshots">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Storage Used</div>
+        <div class="stat-value" id="storageUsed">0 KB</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>📝 Test Log</h2>
+    <div class="log" id="testLog"></div>
+  </div>
+
+  <!-- Mock Chrome Storage API -->
+  <script>
+    // Mock chrome.storage.local for testing
+    window.chrome = {
+      storage: {
+        local: {
+          data: {},
+          get: function(keys, callback) {
+            const result = {};
+            if (Array.isArray(keys)) {
+              keys.forEach(key => {
+                if (this.data[key]) result[key] = this.data[key];
+              });
+            } else if (typeof keys === 'string') {
+              if (this.data[keys]) result[keys] = this.data[keys];
+            }
+            callback(result);
+          },
+          set: function(items, callback) {
+            Object.assign(this.data, items);
+            if (callback) callback();
+          },
+          clear: function(callback) {
+            this.data = {};
+            if (callback) callback();
+          }
+        }
+      }
+    };
+  </script>
+
+  <script src="utils/price-history-engine.js"></script>
+  <script src="utils/price-history-visualizer.js"></script>
+  <script src="utils/price-history-integration.js"></script>
+
+  <script>
+    const integration = new PriceHistoryIntegration();
+    const engine = new PriceHistoryEngine();
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('testLog');
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-${type}">${message}</span>`;
+      logDiv.insertBefore(entry, logDiv.firstChild);
+    }
+
+    async function trackPrice(site, id, price, title) {
+      const url = site === 'amazon' 
+        ? `https://www.amazon.com/dp/${id}`
+        : `https://www.walmart.com/ip/${title.replace(/\s+/g, '-')}/${id}`;
+      
+      const productData = { title, url };
+      
+      await integration.initialize(url, price, productData);
+      log(`✓ Tracked price for ${title}: $${price}`, 'success');
+      updateStats();
+    }
+
+    async function showHistory(site, id, price, title) {
+      const url = site === 'amazon' 
+        ? `https://www.amazon.com/dp/${id}`
+        : `https://www.walmart.com/ip/${title.replace(/\s+/g, '-')}/${id}`;
+      
+      const productData = { title, url };
+      
+      await integration.showPriceHistory(url, price, productData);
+      log(`📊 Showing price history for ${title}`, 'info');
+    }
+
+    async function addButton(site, id, price, title) {
+      const url = site === 'amazon' 
+        ? `https://www.amazon.com/dp/${id}`
+        : `https://www.walmart.com/ip/${title.replace(/\s+/g, '-')}/${id}`;
+      
+      const productData = { title, url };
+      const targetElement = document.querySelector('.test-section');
+      
+      integration.addPriceHistoryButton(targetElement, url, price, productData);
+      log(`🔘 Added price history button for ${title}`, 'success');
+    }
+
+    async function testSimulatedData() {
+      const snapshots = engine.generateSimulatedHistory(299.99, 30);
+      log(`✓ Generated ${snapshots.length} simulated data points`, 'success');
+      console.log('Simulated data:', snapshots);
+    }
+
+    async function testAnalytics() {
+      const snapshots = engine.generateSimulatedHistory(399.99, 30);
+      const analytics = engine.calculateAnalytics(snapshots, 399.99);
+      log(`✓ Analytics: Low=$${analytics.lowest}, High=$${analytics.highest}, Avg=$${analytics.average}`, 'success');
+      log(`  Buy Timing: ${analytics.buyTiming}, Ranking: ${analytics.ranking}%`, 'info');
+      console.log('Analytics:', analytics);
+    }
+
+    async function testMultipleSnapshots() {
+      const products = [
+        { id: 'B09XS7JWHH', price: 399.99, title: 'Sony Headphones' },
+        { id: 'B0CHWRXH8B', price: 249.00, title: 'AirPods Pro' },
+        { id: '12345678', price: 1299.99, title: 'Galaxy S24' }
+      ];
+
+      for (const product of products) {
+        const url = `https://www.amazon.com/dp/${product.id}`;
+        await engine.savePriceSnapshot(product.id, product.price, 'amazon.com', { title: product.title, url });
+      }
+
+      log(`✓ Added snapshots for ${products.length} products`, 'success');
+      updateStats();
+    }
+
+    async function viewStoredData() {
+      const history = await engine.loadHistory();
+      console.log('Stored price history:', history);
+      log(`📦 Stored data logged to console (${Object.keys(history).length} products)`, 'info');
+    }
+
+    async function clearAllData() {
+      chrome.storage.local.clear();
+      sessionStorage.clear();
+      log('🗑️ All data cleared', 'error');
+      updateStats();
+    }
+
+    async function performMaintenance() {
+      await integration.performMaintenance();
+      log('🔧 Maintenance completed - old data cleared', 'success');
+      updateStats();
+    }
+
+    async function updateStats() {
+      const history = await engine.loadHistory();
+      const products = Object.keys(history).length;
+      let totalSnapshots = 0;
+      
+      Object.values(history).forEach(product => {
+        totalSnapshots += product.snapshots.length;
+      });
+
+      const storageSize = JSON.stringify(history).length / 1024;
+
+      document.getElementById('productsTracked').textContent = products;
+      document.getElementById('totalSnapshots').textContent = totalSnapshots;
+      document.getElementById('storageUsed').textContent = storageSize.toFixed(2) + ' KB';
+    }
+
+    // Initialize
+    log('🚀 Price History Engine Test Suite initialized', 'success');
+    updateStats();
+  </script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Price Comparison Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 2px solid #007bff;
+      padding-bottom: 10px;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f8f9fa;
+      border-left: 4px solid #007bff;
+    }
+    .test-section h2 {
+      margin-top: 0;
+      color: #007bff;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success {
+      color: #28a745;
+    }
+    .error {
+      color: #dc3545;
+    }
+    .info {
+      color: #17a2b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛒 Smart Price Comparison Engine - Test Suite</h1>
+    
+    <div class="test-section">
+      <h2>1. Product Normalizer Test</h2>
+      <button onclick="testNormalizer()">Test Normalizer</button>
+      <div id="normalizer-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>2. Search URL Generator Test</h2>
+      <button onclick="testURLGenerator()">Test URL Generator</button>
+      <div id="url-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>3. Product Detector Test</h2>
+      <p class="info">Note: This test simulates Amazon product page detection</p>
+      <button onclick="testDetector()">Test Detector</button>
+      <div id="detector-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>4. Scraper Test</h2>
+      <button onclick="testScrapers()">Test Scrapers</button>
+      <div id="scraper-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>5. Full Integration Test</h2>
+      <p class="info">Note: This requires Chrome extension context</p>
+      <button onclick="testFullIntegration()">Test Full Comparison</button>
+      <div id="integration-result" class="result"></div>
+    </div>
+  </div>
+
+  <!-- Load all modules -->
+  <script src="utils/product-normalizer.js"></script>
+  <script src="utils/product-detector.js"></script>
+  <script src="utils/search-url-generator.js"></script>
+  <script src="utils/site-scrapers/base-scraper.js"></script>
+  <script src="utils/site-scrapers/flipkart-scraper.js"></script>
+  <script src="utils/site-scrapers/ebay-scraper.js"></script>
+  <script src="utils/site-scrapers/walmart-scraper.js"></script>
+  <script src="utils/site-scrapers/scraper-factory.js"></script>
+  <script src="utils/price-comparison-engine.js"></script>
+
+  <script>
+    // Test 1: Product Normalizer
+    function testNormalizer() {
+      const result = document.getElementById('normalizer-result');
+      result.innerHTML = 'Testing...\n';
+
+      try {
+        const normalizer = new ProductNormalizer();
+        
+        const testCases = [
+          "Apple iPhone 15 Pro Max (256GB) - Blue Titanium",
+          "Samsung Galaxy S24 Ultra [512GB Storage] | 5G Smartphone",
+          "Sony WH-1000XM5 Wireless Noise Cancelling Headphones - Black (Pack of 1)",
+          "Dell XPS 13 Laptop - Intel Core i7, 16GB RAM, 512GB SSD"
+        ];
+
+        let output = '<span class="success">✓ Normalizer Test Passed</span>\n\n';
+        
+        testCases.forEach((title, i) => {
+          const normalized = normalizer.normalize(title);
+          const queries = normalizer.generateSearchQueries(title);
+          
+          output += `Test ${i + 1}:\n`;
+          output += `Original: ${title}\n`;
+          output += `Normalized: ${normalized}\n`;
+          output += `Queries: ${JSON.stringify(queries, null, 2)}\n\n`;
+        });
+
+        result.innerHTML = output;
+      } catch (error) {
+        result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Test 2: URL Generator
+    function testURLGenerator() {
+      const result = document.getElementById('url-result');
+      result.innerHTML = 'Testing...\n';
+
+      try {
+        const generator = new SearchURLGenerator();
+        const searchQuery = "apple iphone 15 pro";
+
+        let output = '<span class="success">✓ URL Generator Test Passed</span>\n\n';
+        output += `Search Query: "${searchQuery}"\n\n`;
+
+        const urls = generator.generateAllURLs(searchQuery);
+        
+        for (const [site, url] of Object.entries(urls)) {
+          output += `${site.toUpperCase()}:\n${url}\n\n`;
+        }
+
+        output += `\nSupported Sites: ${generator.getSupportedSites().join(', ')}`;
+
+        result.innerHTML = output;
+      } catch (error) {
+        result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Test 3: Product Detector
+    function testDetector() {
+      const result = document.getElementById('detector-result');
+      result.innerHTML = 'Testing...\n';
+
+      try {
+        const detector = new ProductDetector();
+        
+        let output = '<span class="info">ℹ Product Detector Test</span>\n\n';
+        output += 'Current Page Detection:\n';
+        
+        const productInfo = detector.detectProductPage();
+        
+        if (productInfo) {
+          output += '<span class="success">✓ Product page detected!</span>\n\n';
+          output += JSON.stringify(productInfo, null, 2);
+        } else {
+          output += '<span class="info">ℹ Not a product page or unsupported site</span>\n';
+          output += 'To test properly, open this page on:\n';
+          output += '- Amazon product page (amazon.com/dp/...)\n';
+          output += '- Flipkart product page (flipkart.com/p/...)\n';
+          output += '- eBay product page (ebay.com/itm/...)\n';
+        }
+
+        result.innerHTML = output;
+      } catch (error) {
+        result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Test 4: Scrapers
+    function testScrapers() {
+      const result = document.getElementById('scraper-result');
+      result.innerHTML = 'Testing...\n';
+
+      try {
+        const factory = new ScraperFactory();
+        
+        let output = '<span class="success">✓ Scraper Factory Test</span>\n\n';
+        output += `Supported Sites: ${factory.getSupportedSites().join(', ')}\n\n`;
+
+        // Test each scraper with mock HTML
+        const mockFlipkartHTML = `
+          <div class="_1AtVbE">
+            <div class="_4rR01T">Test Product Title</div>
+            <div class="_30jeq3 _16Jk6d">₹999</div>
+            <a class="_1fQZEK" href="/p/test-product">Link</a>
+          </div>
+        `;
+
+        const mockEbayHTML = `
+          <div class="s-item">
+            <h3 class="s-item__title">Test Product</h3>
+            <span class="s-item__price">$99.99</span>
+            <a class="s-item__link" href="https://ebay.com/itm/123">Link</a>
+          </div>
+        `;
+
+        // Test Flipkart scraper
+        const flipkartScraper = factory.getScraper('flipkart');
+        if (flipkartScraper) {
+          flipkartScraper.scrape(mockFlipkartHTML).then(result => {
+            output += 'Flipkart Scraper:\n';
+            output += JSON.stringify(result, null, 2) + '\n\n';
+            
+            // Test eBay scraper
+            const ebayScraper = factory.getScraper('ebay');
+            return ebayScraper.scrape(mockEbayHTML);
+          }).then(result => {
+            output += 'eBay Scraper:\n';
+            output += JSON.stringify(result, null, 2) + '\n';
+            result.innerHTML = output;
+          });
+        }
+
+      } catch (error) {
+        result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Test 5: Full Integration
+    function testFullIntegration() {
+      const result = document.getElementById('integration-result');
+      result.innerHTML = 'Testing...\n';
+
+      try {
+        if (typeof chrome === 'undefined' || !chrome.runtime) {
+          result.innerHTML = '<span class="error">✗ Chrome extension context required</span>\n\n';
+          result.innerHTML += 'This test must be run within the Chrome extension.\n';
+          result.innerHTML += 'Load the extension and test on an Amazon product page.';
+          return;
+        }
+
+        const engine = new PriceComparisonEngine();
+        
+        result.innerHTML = '<span class="info">Running full comparison...</span>\n';
+        
+        engine.compareCurrentProduct().then(comparison => {
+          let output = '';
+          
+          if (comparison.success) {
+            output += '<span class="success">✓ Comparison Successful!</span>\n\n';
+            output += JSON.stringify(comparison, null, 2);
+          } else {
+            output += '<span class="error">✗ Comparison Failed</span>\n\n';
+            output += `Error: ${comparison.error}`;
+          }
+          
+          result.innerHTML = output;
+        }).catch(error => {
+          result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+        });
+
+      } catch (error) {
+        result.innerHTML = `<span class="error">✗ Error: ${error.message}</span>`;
+      }
+    }
+
+    // Auto-run basic tests on load
+    window.addEventListener('load', () => {
+      console.log('Smart Price Comparison Test Suite Loaded');
+      console.log('Click buttons to run individual tests');
+    });
+  </script>
+</body>
+</html>

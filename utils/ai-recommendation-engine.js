@@ -27,8 +27,17 @@ class AIRecommendationEngine {
   async generateRecommendation(productData, emotion, behaviorData, reviews = []) {
     const { rating, reviewCount, currentPrice, historicalPrice } = productData;
     
+    console.log('[AI Engine] Starting recommendation generation:', {
+      reviewsCount: reviews.length,
+      rating,
+      reviewCount,
+      emotion
+    });
+    
     // Multi-factor analysis
     const reviewAnalysis = await this.analyzeReviewAuthenticity(reviews);
+    console.log('[AI Engine] Review analysis:', reviewAnalysis);
+    
     const emotionalContext = this.analyzeEmotionalState(emotion, behaviorData);
     const priceAnalysis = this.analyzePriceTrend(currentPrice, historicalPrice);
     const ratingAnalysis = this.analyzeRatingQuality(rating, reviewCount);
@@ -42,8 +51,11 @@ class AIRecommendationEngine {
       fakeReviewRisk: reviewAnalysis.fakeReviewRisk
     };
     
+    console.log('[AI Engine] Decision factors:', factors);
+    
     // Generate decision
     const decision = this.makeDecision(factors, emotionalContext);
+    console.log('[AI Engine] Decision:', decision);
     
     // Calculate dynamic confidence
     const confidence = this.calculateConfidence(factors, emotionalContext);
@@ -58,7 +70,7 @@ class AIRecommendationEngine {
       ratingAnalysis
     );
     
-    return {
+    const result = {
       decision: decision.recommendation,
       confidence: Math.round(confidence),
       reasoning,
@@ -72,6 +84,10 @@ class AIRecommendationEngine {
       purchaseRecommendation: this.generatePurchaseRecommendation(productData, reviewAnalysis, ratingAnalysis),
       totalReviews: reviews.length || reviewCount || 0
     };
+    
+    console.log('[AI Engine] Final recommendation:', result);
+    
+    return result;
   }
 
   /**
@@ -80,20 +96,25 @@ class AIRecommendationEngine {
   async analyzeReviewAuthenticity(reviews) {
     if (!reviews || reviews.length === 0) {
       return {
-        trustScore: 0.3,
-        fakeReviewRisk: 0.7,
-        fakePercentage: 0,
+        trustScore: 0.5,
+        fakeReviewRisk: 0.5,
+        fakePercentage: 50,
         authenticCount: 0,
-        suspiciousPatterns: ['No reviews available']
+        suspiciousPatterns: ['No reviews available for analysis'],
+        verifiedPurchaseRatio: 0
       };
     }
 
     const analysis = this.fakeReviewDetector.detectFakeReviews(reviews);
     
+    // Calculate trust score with better weighting
+    const authenticRatio = reviews.length > 0 ? analysis.authenticCount / reviews.length : 0;
+    const fakeRatio = reviews.length > 0 ? analysis.fakeCount / reviews.length : 0;
+    
     const trustScore = Math.max(0, Math.min(1, 
-      (analysis.authenticCount / reviews.length) * 
-      (1 - analysis.fakePercentage / 100) * 
-      (analysis.verifiedPurchaseRatio)
+      (authenticRatio * 0.5) +                           // 50% weight on authentic reviews
+      ((1 - fakeRatio) * 0.3) +                          // 30% weight on low fake ratio
+      (analysis.verifiedPurchaseRatio * 0.2)             // 20% weight on verified purchases
     ));
     
     return {
@@ -232,20 +253,39 @@ class AIRecommendationEngine {
       ratingConsistency * 0.25
     );
     
-    // Apply emotional modifiers
+    // Apply decision logic with proper prioritization
     let recommendation = 'WAIT';
     
-    if (fakeReviewRisk > 0.4) {
+    // High fake review risk is a deal breaker
+    if (fakeReviewRisk > 0.5) {
       recommendation = 'AVOID';
-    } else if (emotionalContext.isImpulsive && decisionScore < 0.8) {
+    } 
+    // Moderate fake risk with low overall score
+    else if (fakeReviewRisk > 0.3 && decisionScore < 0.6) {
+      recommendation = 'AVOID';
+    }
+    // Impulsive behavior with insufficient data
+    else if (emotionalContext.isImpulsive && decisionScore < 0.8) {
       recommendation = 'WAIT';
-    } else if (emotionalContext.isRushed) {
+    } 
+    // Rushed behavior needs caution
+    else if (emotionalContext.isRushed && decisionScore < 0.7) {
       recommendation = 'WAIT';
-    } else if (decisionScore >= 0.75) {
+    } 
+    // Strong positive signals
+    else if (decisionScore >= 0.75 && fakeReviewRisk < 0.3) {
       recommendation = 'BUY';
-    } else if (decisionScore >= 0.55) {
+    } 
+    // Moderate positive signals
+    else if (decisionScore >= 0.6 && fakeReviewRisk < 0.2) {
+      recommendation = 'BUY';
+    }
+    // Decent score but needs more consideration
+    else if (decisionScore >= 0.5) {
       recommendation = 'WAIT';
-    } else {
+    } 
+    // Low score
+    else {
       recommendation = 'AVOID';
     }
     
@@ -336,11 +376,15 @@ class AIRecommendationEngine {
     if (fakeReviewRisk > 0.5) {
       return `⚠️ High fake review risk (${Math.round(reviewAnalysis.fakePercentage)}% suspicious)—authenticity is questionable.`;
     } else if (fakeReviewRisk > 0.3) {
-      return `${reviewAnalysis.authenticCount} authentic reviews found, but ${Math.round(reviewAnalysis.fakePercentage)}% show suspicious patterns.`;
+      return `⚠️ Moderate fake review risk (${Math.round(reviewAnalysis.fakePercentage)}% suspicious)—${reviewAnalysis.authenticCount} authentic reviews found.`;
+    } else if (fakeReviewRisk > 0.15) {
+      return `${reviewAnalysis.authenticCount} authentic reviews with ${Math.round(reviewAnalysis.fakePercentage)}% showing minor concerns.`;
     } else if (reviewAnalysis.verifiedPurchaseRatio > 0.7) {
-      return `Strong review authenticity with ${Math.round(reviewAnalysis.verifiedPurchaseRatio * 100)}% verified purchases.`;
+      return `✓ Strong review authenticity with ${Math.round(reviewAnalysis.verifiedPurchaseRatio * 100)}% verified purchases.`;
+    } else if (reviewAnalysis.authenticCount > 0) {
+      return `✓ Review sentiment appears genuine with ${reviewAnalysis.authenticCount} authentic reviews (${Math.round(reviewAnalysis.fakePercentage)}% fake risk).`;
     } else {
-      return `Review sentiment appears genuine with ${reviewAnalysis.authenticCount} authentic reviews detected.`;
+      return `Limited review data available for authenticity assessment.`;
     }
   }
 
@@ -479,6 +523,8 @@ class FakeReviewDetector {
   }
 
   detectFakeReviews(reviews) {
+    console.log('[Fake Review Detector] Analyzing reviews:', reviews.length);
+    
     const results = reviews.map(review => this.analyzeReview(review));
     
     const fakeCount = results.filter(r => r.isFake).length;
@@ -490,7 +536,7 @@ class FakeReviewDetector {
     
     const suspiciousPatterns = this.detectCollectivePatterns(reviews, results);
     
-    return {
+    const analysis = {
       fakeCount,
       authenticCount,
       fakePercentage,
@@ -498,6 +544,17 @@ class FakeReviewDetector {
       suspiciousPatterns,
       detailedResults: results
     };
+    
+    console.log('[Fake Review Detector] Analysis complete:', {
+      total: reviews.length,
+      fake: fakeCount,
+      authentic: authenticCount,
+      verified: verifiedCount,
+      fakePercentage: fakePercentage.toFixed(1) + '%',
+      verifiedRatio: (verifiedPurchaseRatio * 100).toFixed(1) + '%'
+    });
+    
+    return analysis;
   }
 
   analyzeReview(reviewElement) {

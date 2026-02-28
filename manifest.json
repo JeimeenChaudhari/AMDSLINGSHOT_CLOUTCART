@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Emotion-Adaptive Shopping Assistant",
+  "name": "CloutCart",
   "version": "1.0.0",
   "description": "AI-powered shopping assistant with emotion detection, price tracking, and smart recommendations",
   "permissions": [
@@ -74,7 +74,20 @@
         "utils/review-analyzer.js",
         "utils/ai-recommendation-engine.js",
         "utils/price-tracker.js",
+        "utils/product-normalizer.js",
+        "utils/product-detector.js",
+        "utils/search-url-generator.js",
+        "utils/site-scrapers/base-scraper.js",
+        "utils/site-scrapers/flipkart-scraper.js",
+        "utils/site-scrapers/ebay-scraper.js",
+        "utils/site-scrapers/walmart-scraper.js",
+        "utils/site-scrapers/scraper-factory.js",
+        "utils/price-comparison-engine.js",
         "utils/comparison.js",
+        "utils/price-history-engine.js",
+        "utils/price-history-visualizer.js",
+        "utils/price-history-integration.js",
+        "content/price-history-content-integration.js",
         "content/content.js"
       ],
       "css": ["content/content.css"],

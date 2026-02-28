@@ -491,6 +491,9 @@ async function provideFeedback(feedbackType) {
 }
 
 function startFeatures() {
+  console.log('[ESA] Starting features on:', window.location.hostname);
+  console.log('[ESA] Settings:', settings);
+  
   if (settings.emotionEnabled) {
     if (settings.keyboardMode) {
       startKeyboardTracking();
@@ -499,11 +502,30 @@ function startFeatures() {
     }
   }
   
-  if (settings.focusMode) activateFocusMode();
-  if (settings.priceHistory) activatePriceHistory();
-  if (settings.comparison) activateComparison();
-  if (settings.recommendation) activateRecommendation();
-  if (settings.reviewChecker) activateReviewChecker();
+  if (settings.focusMode) {
+    console.log('[ESA] Activating Focus Mode');
+    activateFocusMode();
+  }
+  
+  if (settings.priceHistory) {
+    console.log('[ESA] Activating Price History');
+    activatePriceHistory();
+  }
+  
+  if (settings.comparison) {
+    console.log('[ESA] Activating Price Comparison');
+    activateComparison();
+  }
+  
+  if (settings.recommendation) {
+    console.log('[ESA] Activating AI Recommendation');
+    activateRecommendation();
+  }
+  
+  if (settings.reviewChecker) {
+    console.log('[ESA] Activating Review Checker');
+    activateReviewChecker();
+  }
 }
 
 // Feature 1: Emotion Detection (Keyboard/Cursor Mode)
@@ -928,15 +950,42 @@ function displayPriceHistory(history) {
 function activateComparison() {
   const productName = extractProductName();
   if (!productName) {
-    console.log('Could not extract product name for comparison');
-    return;
+    console.log('[Comparison] Could not extract product name, trying alternative detection...');
+    
+    // Try to detect if we're on a product page by looking for common patterns
+    const hasProductIndicators = 
+      document.querySelector('[class*="product"]') ||
+      document.querySelector('[class*="item"]') ||
+      document.querySelector('[data-product]') ||
+      window.location.pathname.includes('/product') ||
+      window.location.pathname.includes('/item') ||
+      window.location.pathname.includes('/dp/') ||
+      window.location.pathname.includes('/p/');
+    
+    if (!hasProductIndicators) {
+      console.log('[Comparison] Not a product page, skipping comparison feature');
+      return;
+    }
+    
+    // Use page title as fallback
+    const fallbackName = document.title.split('|')[0].split('-')[0].trim();
+    if (!fallbackName || fallbackName.length < 3) {
+      console.log('[Comparison] Could not determine product name from page');
+      return;
+    }
+    
+    console.log('[Comparison] Using fallback product name:', fallbackName);
+  } else {
+    console.log('[Comparison] ✅ Product detected:', productName.substring(0, 50));
   }
 
+  const displayName = productName || document.title.split('|')[0].split('-')[0].trim();
+  
   const comparisonWidget = document.createElement('div');
   comparisonWidget.className = 'esa-comparison';
   comparisonWidget.innerHTML = `
     <h3>🔍 Compare Prices</h3>
-    <p class="esa-comparison-subtitle">Find "${productName.substring(0, 50)}${productName.length > 50 ? '...' : ''}" on other websites</p>
+    <p class="esa-comparison-subtitle">Find "${displayName.substring(0, 50)}${displayName.length > 50 ? '...' : ''}" on other websites</p>
     <button class="esa-compare-btn" id="esa-compare-trigger">
       <span class="btn-icon">🔍</span>
       <span class="btn-text">Search Best Prices</span>
@@ -956,21 +1005,41 @@ function activateComparison() {
     '.pdp-name',
     '.prd-title',
     '.product-heading',
-    '.product_name'
+    '.product_name',
+    'h1[class*="product"]',
+    'h1[class*="title"]',
+    '[class*="ProductTitle"]',
+    'h2[class*="product"]'
   ];
 
   let insertPoint = null;
   for (const selector of insertSelectors) {
     insertPoint = document.querySelector(selector);
-    if (insertPoint) break;
+    if (insertPoint) {
+      console.log('[Comparison] Found insertion point with selector:', selector);
+      break;
+    }
   }
 
   if (insertPoint) {
     insertPoint.parentElement.insertBefore(comparisonWidget, insertPoint.nextSibling);
   } else {
-    // Fallback: insert at top of body
-    document.body.insertBefore(comparisonWidget, document.body.firstChild);
+    console.log('[Comparison] Using fallback insertion point');
+    // Fallback: insert after first main content area
+    const mainContent = document.querySelector('main') || 
+                       document.querySelector('[role="main"]') ||
+                       document.querySelector('#main') ||
+                       document.querySelector('.main-content') ||
+                       document.body;
+    
+    if (mainContent.firstChild) {
+      mainContent.insertBefore(comparisonWidget, mainContent.firstChild);
+    } else {
+      mainContent.appendChild(comparisonWidget);
+    }
   }
+  
+  console.log('[Comparison] ✅ Widget injected successfully');
 
   // Add click handler for the compare button
   const compareBtn = document.getElementById('esa-compare-trigger');
@@ -986,7 +1055,7 @@ function activateComparison() {
       try {
         const priceComparison = new PriceComparison();
         const currentPrice = extractCurrentPrice();
-        const comparisonData = await priceComparison.comparePrice(productName, currentPrice, window.location.hostname);
+        const comparisonData = await priceComparison.comparePrice(displayName, currentPrice, window.location.hostname);
 
         console.log('Price comparison data received:', comparisonData);
         
@@ -1191,7 +1260,31 @@ async function activateRecommendation() {
   const rating = extractRating();
   const reviewCount = extractReviewCount();
 
-  if (!currentPrice || !productName) return;
+  if (!productName) {
+    console.log('[Recommendation] Could not extract product name, trying alternative detection...');
+    
+    // Try to detect if we're on a product page
+    const hasProductIndicators = 
+      document.querySelector('[class*="product"]') ||
+      document.querySelector('[class*="item"]') ||
+      document.querySelector('[data-product]') ||
+      window.location.pathname.includes('/product') ||
+      window.location.pathname.includes('/item') ||
+      window.location.pathname.includes('/dp/') ||
+      window.location.pathname.includes('/p/');
+    
+    if (!hasProductIndicators) {
+      console.log('[Recommendation] Not a product page, skipping recommendation feature');
+      return;
+    }
+  } else {
+    console.log('[Recommendation] ✅ Product detected:', productName.substring(0, 50));
+  }
+
+  const displayName = productName || document.title.split('|')[0].split('-')[0].trim();
+  const displayPrice = currentPrice || 0;
+  
+  console.log('[Recommendation] Price detected:', displayPrice);
 
   const recommendationWidget = document.createElement('div');
   recommendationWidget.className = 'esa-recommendation';
@@ -1209,18 +1302,41 @@ async function activateRecommendation() {
     '.pdp-name',
     '.prd-title',
     '.product-heading',
-    '.product_name'
+    '.product_name',
+    'h1[class*="product"]',
+    'h1[class*="title"]',
+    '[class*="ProductTitle"]',
+    'h2[class*="product"]'
   ];
 
   let insertPoint = null;
   for (const selector of insertSelectors) {
     insertPoint = document.querySelector(selector);
-    if (insertPoint) break;
+    if (insertPoint) {
+      console.log('[Recommendation] Found insertion point with selector:', selector);
+      break;
+    }
   }
 
   if (insertPoint) {
     insertPoint.parentElement.insertBefore(recommendationWidget, insertPoint.nextSibling);
+  } else {
+    console.log('[Recommendation] Using fallback insertion point');
+    // Fallback: insert after first main content area
+    const mainContent = document.querySelector('main') || 
+                       document.querySelector('[role="main"]') ||
+                       document.querySelector('#main') ||
+                       document.querySelector('.main-content') ||
+                       document.body;
+    
+    if (mainContent.firstChild) {
+      mainContent.insertBefore(recommendationWidget, mainContent.firstChild);
+    } else {
+      mainContent.appendChild(recommendationWidget);
+    }
   }
+  
+  console.log('[Recommendation] ✅ Widget injected successfully');
 
   // Perform comprehensive AI analysis
   setTimeout(async () => {
@@ -1249,9 +1365,9 @@ async function activateRecommendation() {
       const productData = {
         rating: rating || 0,
         reviewCount: reviewCount || 0,
-        currentPrice: currentPrice,
+        currentPrice: displayPrice,
         historicalPrice: historicalPrices,
-        productName: productName
+        productName: displayName
       };
 
       // Gather behavioral data
@@ -1321,7 +1437,7 @@ async function activateRecommendation() {
       chrome.storage.local.get(['recommendations'], (data) => {
         const recs = data.recommendations || [];
         recs.push({
-          product: productName,
+          product: displayName,
           decision: result.decision,
           confidence: result.confidence,
           timestamp: Date.now()
@@ -1531,15 +1647,37 @@ function extractProductName() {
     '.prd-title',                      // Tata CLiQ
     '[data-test="product-title"]',    // Various sites
     '.product-heading',                // Nykaa
-    '.product_name'                    // Meesho
+    '.product_name',                   // Meesho
+    'h1',                              // Fallback to any h1
+    'h2[class*="product"]',            // H2 product titles
+    'h2[class*="title"]',              // H2 titles
+    '[class*="ProductTitle"]',         // React-style naming
+    '[class*="productName"]',          // React-style naming
+    '[data-testid*="product"]',        // Test IDs
+    'meta[property="og:title"]'        // Open Graph fallback
   ];
   
   for (const selector of selectors) {
     const el = document.querySelector(selector);
-    if (el && el.textContent.trim()) {
-      return el.textContent.trim();
+    if (el) {
+      let text = '';
+      if (selector.startsWith('meta')) {
+        text = el.getAttribute('content') || '';
+      } else {
+        text = el.textContent.trim();
+      }
+      if (text && text.length > 3) {
+        return text;
+      }
     }
   }
+  
+  // Final fallback: use page title
+  const pageTitle = document.title;
+  if (pageTitle && pageTitle.length > 3) {
+    return pageTitle.split('|')[0].split('-')[0].trim();
+  }
+  
   return null;
 }
 
@@ -1557,20 +1695,48 @@ function extractCurrentPrice() {
     '.selling-price',                  // Nykaa
     '.product-price',                  // Meesho
     '.pdpPrice',                       // Snapdeal
-    '[itemprop="price"]'               // Schema.org
+    '[itemprop="price"]',              // Schema.org
+    '[class*="Price"]',                // React-style naming
+    '[class*="amount"]',               // Amount classes
+    '[data-testid*="price"]',          // Test IDs
+    'meta[property="og:price:amount"]',// Open Graph
+    'meta[property="product:price:amount"]', // Product meta
+    'span[class*="price"]',            // Span with price
+    'div[class*="price"]'              // Div with price
   ];
   
   for (const selector of selectors) {
     const el = document.querySelector(selector);
     if (el) {
-      const priceText = el.textContent || el.getAttribute('content') || '';
+      const priceText = el.textContent || el.getAttribute('content') || el.getAttribute('data-price') || '';
       const cleanPrice = priceText.replace(/[^0-9.]/g, '');
       const price = parseFloat(cleanPrice);
-      if (price && price > 0) {
+      if (price && price > 0 && price < 10000000) { // Sanity check
         return price;
       }
     }
   }
+  
+  // Fallback: search for price patterns in the entire page
+  const bodyText = document.body.textContent;
+  const pricePatterns = [
+    /₹\s*([0-9,]+(?:\.[0-9]{2})?)/,
+    /Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+    /INR\s*([0-9,]+(?:\.[0-9]{2})?)/i,
+    /\$\s*([0-9,]+(?:\.[0-9]{2})?)/
+  ];
+  
+  for (const pattern of pricePatterns) {
+    const match = bodyText.match(pattern);
+    if (match) {
+      const cleanPrice = match[1].replace(/,/g, '');
+      const price = parseFloat(cleanPrice);
+      if (price && price > 0 && price < 10000000) {
+        return price;
+      }
+    }
+  }
+  
   return null;
 }
 

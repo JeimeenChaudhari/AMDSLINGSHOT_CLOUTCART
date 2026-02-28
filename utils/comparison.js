@@ -344,11 +344,13 @@ class PriceComparison {
     const variations = [productName]; // Original search term
     
     // Remove common words that might limit results
-    const wordsToRemove = ['(', ')', '-', 'GB', 'TB', 'MB', 'Blue', 'Black', 'White', 'Red', 'Green', 'Gold', 'Silver'];
+    const wordsToRemove = ['\\(', '\\)', '-', 'GB', 'TB', 'MB', 'Blue', 'Black', 'White', 'Red', 'Green', 'Gold', 'Silver'];
     let simplified = productName;
     
     wordsToRemove.forEach(word => {
-      simplified = simplified.replace(new RegExp(word, 'gi'), ' ');
+      // Escape special regex characters
+      const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      simplified = simplified.replace(new RegExp(escapedWord, 'gi'), ' ');
     });
     simplified = simplified.replace(/\s+/g, ' ').trim();
     
