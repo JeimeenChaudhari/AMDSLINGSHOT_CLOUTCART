@@ -1,10 +1,11 @@
 // Price comparison utilities
 class PriceComparison {
   constructor() {
-    // API configuration for PricesAPI.io
+    // API configuration for RapidAPI
     this.apiConfig = {
-      endpoint: 'https://api.pricesapi.io/api/v1',
-      apiKey: 'pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt',
+      endpoint: 'https://real-time-product-search.p.rapidapi.com',
+      apiKey: '6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8',
+      apiHost: 'real-time-product-search.p.rapidapi.com',
       enabled: true,
       timeout: 15000 // 15 second timeout for real-time scraping
     };
@@ -171,7 +172,8 @@ class PriceComparison {
               productName: searchTerm,
               country: 'in',
               limit: 50,
-              apiKey: this.apiConfig.apiKey
+              apiKey: this.apiConfig.apiKey,
+              apiHost: this.apiConfig.apiHost
             }, response => {
               if (chrome.runtime.lastError) {
                 reject(new Error(chrome.runtime.lastError.message));
@@ -190,9 +192,9 @@ class PriceComparison {
           return null;
         });
         
-        if (searchResponse && searchResponse.products && searchResponse.products.length > 0) {
-          console.log('PricesAPI: Found', searchResponse.products.length, 'products for:', searchTerm);
-          allProducts = allProducts.concat(searchResponse.products);
+        if (searchResponse && searchResponse.data && searchResponse.data.length > 0) {
+          console.log('PricesAPI: Found', searchResponse.data.length, 'products for:', searchTerm);
+          allProducts = allProducts.concat(searchResponse.data);
           
           // If we found enough products, stop searching
           if (allProducts.length >= 20) {
@@ -202,7 +204,7 @@ class PriceComparison {
       }
       
       // Remove duplicates based on product ID
-      const uniqueProducts = Array.from(new Map(allProducts.map(p => [p.id, p])).values());
+      const uniqueProducts = Array.from(new Map(allProducts.map(p => [p.product_id, p])).values());
       console.log('PricesAPI: Total unique products found:', uniqueProducts.length);
       
       if (uniqueProducts.length === 0) {
@@ -215,8 +217,8 @@ class PriceComparison {
       const productsToCheck = uniqueProducts.slice(0, 10); // Check top 10 matches
       
       for (const product of productsToCheck) {
-        const productId = product.id;
-        console.log('PricesAPI: Fetching offers for product:', product.title);
+        const productId = product.product_id;
+        console.log('PricesAPI: Fetching offers for product:', product.product_title);
         
         try {
           const offersResponse = await Promise.race([
@@ -225,7 +227,8 @@ class PriceComparison {
                 action: 'pricesApiOffers',
                 productId: productId,
                 country: 'in',
-                apiKey: this.apiConfig.apiKey
+                apiKey: this.apiConfig.apiKey,
+                apiHost: this.apiConfig.apiHost
               }, response => {
                 if (chrome.runtime.lastError) {
                   reject(new Error(chrome.runtime.lastError.message));
@@ -241,18 +244,19 @@ class PriceComparison {
             )
           ]);
           
-          console.log('PricesAPI: Offers response for', product.title, ':', offersResponse);
+          console.log('PricesAPI: Offers response for', product.product_title, ':', offersResponse);
           
           // Step 3: Process offers from different retailers
-          if (offersResponse && offersResponse.offers && offersResponse.offers.length > 0) {
-            console.log('PricesAPI: Found', offersResponse.offers.length, 'offers for this product');
+          if (offersResponse && offersResponse.data && offersResponse.data.offers && offersResponse.data.offers.length > 0) {
+            console.log('PricesAPI: Found', offersResponse.data.offers.length, 'offers for this product');
             
-            for (const offer of offersResponse.offers) {
-              const retailerName = offer.seller || offer.merchant || offer.source || 'Unknown Retailer';
-              const offerUrl = offer.url || offer.link;
-              const price = offer.price;
-              const currency = offer.currency || '₹';
-              const availability = offer.availability || offer.stock_status || 'Check Availability';
+            for (const offer of offersResponse.data.offers) {
+              const retailerName = offer.store_name || 'Unknown Retailer';
+              const offerUrl = offer.offer_page_url;
+              const priceStr = offer.price || '';
+              const price = parseFloat(priceStr.replace(/[^0-9.]/g, ''));
+              const currency = '₹';
+              const availability = offer.store_rating ? `Rating: ${offer.store_rating}` : 'Check Availability';
               
               if (!offerUrl || !price) {
                 continue;
@@ -289,12 +293,12 @@ class PriceComparison {
                 icon: siteIcon,
                 url: offerUrl,
                 domain: urlDomain,
-                price: parseFloat(price),
+                price: price,
                 currency: currency,
                 availability: availability,
                 searchMode: false,
                 retailerName: retailerName,
-                productTitle: product.title
+                productTitle: product.product_title
               });
               
               console.log('Added offer:', siteName, price, currency);

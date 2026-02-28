@@ -943,7 +943,7 @@ function activateComparison() {
     </button>
     <div class="esa-comparison-results"></div>
     <div class="esa-comparison-note" style="display: none;">
-      <small>💡 Powered by PricesAPI.io - Real-time price comparison across multiple retailers</small>
+      <small>💡 Powered by RapidAPI - Real-time price comparison across multiple retailers</small>
     </div>
   `;
 
@@ -1126,7 +1126,7 @@ function activateComparison() {
         if (comparisonData.apiUsed) {
           resultsHTML += `
             <div class="esa-comparison-api-notice success">
-              <small>✅ Real-time prices fetched from PricesAPI.io</small>
+              <small>✅ Real-time prices fetched from RapidAPI</small>
             </div>
           `;
         }

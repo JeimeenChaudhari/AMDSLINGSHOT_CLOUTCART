@@ -67,14 +67,15 @@
 
     <div class="test-section">
         <h2>API Configuration</h2>
-        <p><strong>Endpoint:</strong> https://api.pricesapi.io/api/v1</p>
-        <p><strong>API Key:</strong>pricesapi_EmpsnXiQfYdiIJ4aoRSxcQZ1168q50</p>
+        <p><strong>Endpoint:</strong> https://real-time-product-search.p.rapidapi.com</p>
+        <p><strong>API Key:</strong> 6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8</p>
         <p><strong>Country:</strong> in (India)</p>
     </div>
 
     <script>
-        const API_KEY = 'pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt';
-        const BASE_URL = 'https://api.pricesapi.io/api/v1';
+        const API_KEY = '6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8';
+        const API_HOST = 'real-time-product-search.p.rapidapi.com';
+        const BASE_URL = 'https://real-time-product-search.p.rapidapi.com';
 
         async function testSearch() {
             const query = document.getElementById('searchQuery').value;
@@ -83,13 +84,15 @@
             resultDiv.innerHTML = 'Loading...';
             
             try {
-                const url = `${BASE_URL}/products/search?q=${encodeURIComponent(query)}&limit=5&country=in&api_key=${API_KEY}`;
+                const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&limit=5&country=in`;
                 
                 console.log('Request URL:', url);
                 
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
+                        'X-RapidAPI-Key': API_KEY,
+                        'X-RapidAPI-Host': API_HOST,
                         'Accept': 'application/json'
                     }
                 });
@@ -107,8 +110,8 @@
                 resultDiv.innerHTML = `<div class="success">✅ Success!</div>\n${JSON.stringify(data, null, 2)}`;
                 
                 // Auto-fill product ID if available
-                if (data.products && data.products.length > 0) {
-                    document.getElementById('productId').value = data.products[0].id;
+                if (data.data && data.data.length > 0) {
+                    document.getElementById('productId').value = data.data[0].product_id;
                 }
                 
             } catch (error) {
@@ -129,13 +132,15 @@
             resultDiv.innerHTML = 'Loading...';
             
             try {
-                const url = `${BASE_URL}/products/${productId}/offers?country=in&api_key=${API_KEY}`;
+                const url = `${BASE_URL}/product/${productId}?country=in`;
                 
                 console.log('Request URL:', url);
                 
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
+                        'X-RapidAPI-Key': API_KEY,
+                        'X-RapidAPI-Host': API_HOST,
                         'Accept': 'application/json'
                     }
                 });

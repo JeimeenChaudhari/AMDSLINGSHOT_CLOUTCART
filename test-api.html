@@ -10,8 +10,9 @@
     <pre id="output" style="background: #f5f5f5; padding: 15px; border-radius: 5px;"></pre>
 
     <script>
-        const API_KEY = 'pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt';
-        const API_ENDPOINT = 'https://api.pricesapi.io/api/v1';
+        const API_KEY = '6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8';
+        const API_HOST = 'real-time-product-search.p.rapidapi.com';
+        const API_ENDPOINT = 'https://real-time-product-search.p.rapidapi.com';
 
         function log(message) {
             const output = document.getElementById('output');
@@ -21,28 +22,24 @@
 
         async function testAPI() {
             document.getElementById('output').textContent = '';
-            log('Testing PricesAPI.io (Job-Based)...\n');
+            log('Testing RapidAPI Product Search...\n');
             
             const productName = document.getElementById('productName').value;
-            const jobUrl = `${API_ENDPOINT}/jobs?api_key=${API_KEY}`;
+            const searchUrl = `${API_ENDPOINT}/search?q=${encodeURIComponent(productName)}&country=in&limit=10`;
             
             log('Product: ' + productName);
-            log('URL: ' + jobUrl);
-            log('Method: POST\n');
+            log('URL: ' + searchUrl);
+            log('Method: GET\n');
             
             try {
                 log('Sending request...');
-                const response = await fetch(jobUrl, {
-                    method: 'POST',
+                const response = await fetch(searchUrl, {
+                    method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        source: 'google_shopping',
-                        country: 'in',
-                        query: productName,
-                        parse: true
-                    })
+                        'X-RapidAPI-Key': API_KEY,
+                        'X-RapidAPI-Host': API_HOST,
+                        'Accept': 'application/json'
+                    }
                 });
                 
                 log('Status: ' + response.status + '\n');
@@ -58,22 +55,22 @@
                 log('Full Response:\n' + JSON.stringify(data, null, 2) + '\n');
                 
                 // Parse results
-                if (data && data.results && data.results.organic_results) {
-                    const results = data.results.organic_results;
+                if (data && data.data) {
+                    const results = data.data;
                     log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                     log('Found ' + results.length + ' products:\n');
                     
                     results.slice(0, 5).forEach((result, i) => {
                         log(`Product ${i + 1}:`);
-                        log('  Title: ' + (result.title || 'N/A'));
-                        log('  Price: ' + (result.price || result.extracted_price || 'N/A'));
-                        log('  Source: ' + (result.source || 'N/A'));
-                        log('  Link: ' + (result.link || 'N/A'));
-                        log('  Domain: ' + (result.link ? new URL(result.link).hostname : 'N/A'));
+                        log('  Title: ' + (result.product_title || 'N/A'));
+                        log('  Price: ' + (result.offer?.price || 'N/A'));
+                        log('  Store: ' + (result.offer?.store_name || 'N/A'));
+                        log('  Link: ' + (result.product_page_url || 'N/A'));
+                        log('  Rating: ' + (result.product_star_rating || 'N/A'));
                         log('');
                     });
                 } else {
-                    log('❌ No organic_results found in response');
+                    log('❌ No data found in response');
                 }
             } catch (error) {
                 log('❌ Error: ' + error.message);

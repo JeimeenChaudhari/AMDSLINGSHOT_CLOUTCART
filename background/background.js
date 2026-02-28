@@ -74,15 +74,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
   
-  // Handle PricesAPI requests to avoid CORS issues
+  // Handle RapidAPI requests to avoid CORS issues
   if (message.action === 'pricesApiSearch') {
-    const { productName, country, limit, apiKey } = message;
-    const searchLimit = limit || 10; // Default to 10 if not specified
-    const searchUrl = `https://api.pricesapi.io/api/v1/products/search?q=${encodeURIComponent(productName)}&limit=${searchLimit}&country=${country || 'in'}&api_key=${apiKey}`;
+    const { productName, country, limit, apiKey, apiHost } = message;
+    const searchLimit = limit || 10;
+    const searchUrl = `https://real-time-product-search.p.rapidapi.com/search?q=${encodeURIComponent(productName)}&country=${country || 'in'}&limit=${searchLimit}`;
     
     fetch(searchUrl, {
       method: 'GET',
       headers: {
+        'X-RapidAPI-Key': apiKey,
+        'X-RapidAPI-Host': apiHost || 'real-time-product-search.p.rapidapi.com',
         'Accept': 'application/json'
       }
     })
@@ -100,7 +102,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, data: data });
     })
     .catch(error => {
-      console.error('PricesAPI search error:', error);
+      console.error('RapidAPI search error:', error);
       sendResponse({ success: false, error: error.message });
     });
     
@@ -108,12 +110,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.action === 'pricesApiOffers') {
-    const { productId, country, apiKey } = message;
-    const offersUrl = `https://api.pricesapi.io/api/v1/products/${productId}/offers?country=${country || 'in'}&api_key=${apiKey}`;
+    const { productId, country, apiKey, apiHost } = message;
+    const offersUrl = `https://real-time-product-search.p.rapidapi.com/product/${productId}?country=${country || 'in'}`;
     
     fetch(offersUrl, {
       method: 'GET',
       headers: {
+        'X-RapidAPI-Key': apiKey,
+        'X-RapidAPI-Host': apiHost || 'real-time-product-search.p.rapidapi.com',
         'Accept': 'application/json'
       }
     })
@@ -131,7 +135,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true, data: data });
     })
     .catch(error => {
-      console.error('PricesAPI offers error:', error);
+      console.error('RapidAPI offers error:', error);
       sendResponse({ success: false, error: error.message });
     });
     

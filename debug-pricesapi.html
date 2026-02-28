@@ -139,8 +139,8 @@
     <h1>🔍 PricesAPI Debug Tool</h1>
     
     <div class="input-group">
-      <label for="apiKey">API Key:</label>
-      <input type="text" id="apiKey" value="pricesapi_njBc2fq9ye8Ia7LR1vebV38Q3URPWFEt" placeholder="Enter your PricesAPI key">
+      <label for="apiKey">RapidAPI Key:</label>
+      <input type="text" id="apiKey" value="6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8" placeholder="Enter your RapidAPI key">
     </div>
     
     <div class="input-group">
@@ -188,11 +188,18 @@
       
       try {
         // Step 1: Search for products
-        const searchUrl = `https://api.pricesapi.io/api/v1/products/search?q=${encodeURIComponent(productName)}&limit=${searchLimit}&country=${country}&api_key=${apiKey}`;
+        const searchUrl = `https://real-time-product-search.p.rapidapi.com/search?q=${encodeURIComponent(productName)}&limit=${searchLimit}&country=${country}`;
         
         console.log('Search URL:', searchUrl);
         
-        const searchResponse = await fetch(searchUrl);
+        const searchResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: {
+            'X-RapidAPI-Key': apiKey,
+            'X-RapidAPI-Host': 'real-time-product-search.p.rapidapi.com',
+            'Accept': 'application/json'
+          }
+        });
         const searchData = await searchResponse.json();
         
         console.log('Search Response:', searchData);
@@ -201,7 +208,7 @@
           throw new Error(`Search failed: ${JSON.stringify(searchData)}`);
         }
         
-        allProducts = searchData.products || [];
+        allProducts = searchData.data || [];
         
         let html = `
           <div class="section">
@@ -240,27 +247,36 @@
           const product = allProducts[i];
           
           try {
-            const offersUrl = `https://api.pricesapi.io/api/v1/products/${product.id}/offers?country=${country}&api_key=${apiKey}`;
-            console.log(`Fetching offers for product ${i + 1}:`, product.title);
+            const offersUrl = `https://real-time-product-search.p.rapidapi.com/product/${product.product_id}?country=${country}`;
+            console.log(`Fetching offers for product ${i + 1}:`, product.product_title);
             
-            const offersResponse = await fetch(offersUrl);
+            const offersResponse = await fetch(offersUrl, {
+              method: 'GET',
+              headers: {
+                'X-RapidAPI-Key': apiKey,
+                'X-RapidAPI-Host': 'real-time-product-search.p.rapidapi.com',
+                'Accept': 'application/json'
+              }
+            });
             const offersData = await offersResponse.json();
             
-            console.log(`Offers for "${product.title}":`, offersData);
+            console.log(`Offers for "${product.product_title}":`, offersData);
             
-            if (offersData.offers && offersData.offers.length > 0) {
-              offersData.offers.forEach(offer => {
-                const retailerDomain = extractDomain(offer.url);
+            if (offersData.data && offersData.data.offers && offersData.data.offers.length > 0) {
+              console.log('Found', offersData.data.offers.length, 'offers for this product');
+              
+              offersData.data.offers.forEach(offer => {
+                const retailerDomain = extractDomain(offer.offer_page_url);
                 if (!seenRetailers.has(retailerDomain)) {
                   seenRetailers.add(retailerDomain);
                   allOffers.push({
-                    product: product.title,
-                    retailer: offer.seller || offer.merchant || retailerDomain,
-                    price: offer.price,
-                    currency: offer.currency || '₹',
-                    url: offer.url,
+                    product: product.product_title,
+                    retailer: offer.store_name || retailerDomain,
+                    price: parseFloat(offer.price.replace(/[^0-9.]/g, '')),
+                    currency: '₹',
+                    url: offer.offer_page_url,
                     domain: retailerDomain,
-                    availability: offer.availability || 'Check Availability'
+                    availability: offer.store_rating ? `Rating: ${offer.store_rating}` : 'Check Availability'
                   });
                 }
               });
@@ -347,10 +363,11 @@
       products.slice(0, 5).forEach((product, index) => {
         html += `
           <div class="product-card">
-            <h4>${index + 1}. ${product.title}</h4>
-            <p><strong>ID:</strong> ${product.id}</p>
-            ${product.brand ? `<p><strong>Brand:</strong> ${product.brand}</p>` : ''}
-            ${product.category ? `<p><strong>Category:</strong> ${product.category}</p>` : ''}
+            <h4>${index + 1}. ${product.product_title}</h4>
+            <p><strong>ID:</strong> ${product.product_id}</p>
+            ${product.offer?.store_name ? `<p><strong>Store:</strong> ${product.offer.store_name}</p>` : ''}
+            ${product.product_star_rating ? `<p><strong>Rating:</strong> ${product.product_star_rating} ⭐</p>` : ''}
+            ${product.offer?.price ? `<p><strong>Price:</strong> ${product.offer.price}</p>` : ''}
           </div>
         `;
       });

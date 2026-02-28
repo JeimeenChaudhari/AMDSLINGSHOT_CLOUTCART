@@ -124,7 +124,7 @@ Show Best Deals
   - TensorFlow.js (emotion classification)
   - Custom ML models (behavioral detection)
 - **Storage**: Chrome Storage API, IndexedDB
-- **APIs**: PricesAPI.io (price comparison)
+- **APIs**: RapidAPI Real-Time Product Search (price comparison)
 
 ## 📁 Project Structure
 
@@ -277,7 +277,7 @@ For issues or questions:
 
 - face-api.js by Vladimir Mandic
 - TensorFlow.js by Google
-- PricesAPI.io for price data
+- RapidAPI Real-Time Product Search for price data
 - Chrome Extensions API
 
 ---
