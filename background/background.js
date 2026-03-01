@@ -172,6 +172,29 @@ class PriceFetcher {
     }
   }
 
+  // Fetch multiple URLs in parallel with limited concurrency
+  async fetchMultiple(urls, options = {}) {
+    const { maxConcurrent = 3 } = options;
+    const results = new Map();
+
+    // Process in batches to avoid overwhelming the browser
+    for (let i = 0; i < urls.length; i += maxConcurrent) {
+      const batch = urls.slice(i, i + maxConcurrent);
+      const promises = batch.map(async (url) => {
+        const result = await this.fetchProductPage(url, options);
+        return { url, result };
+      });
+
+      const batchResults = await Promise.all(promises);
+
+      for (const { url, result } of batchResults) {
+        results.set(url, result);
+      }
+    }
+
+    return results;
+  }
+
   getCacheKey(url) {
     return url.split('?')[0]; // Ignore query params for caching
   }

@@ -494,6 +494,10 @@ function startFeatures() {
   console.log('[ESA] Starting features on:', window.location.hostname);
   console.log('[ESA] Settings:', settings);
   
+  // Check if we're on a product page
+  const isProductPage = isOnProductPage();
+  console.log('[ESA] Is product page:', isProductPage);
+  
   if (settings.emotionEnabled) {
     if (settings.keyboardMode) {
       startKeyboardTracking();
@@ -507,24 +511,29 @@ function startFeatures() {
     activateFocusMode();
   }
   
-  if (settings.priceHistory) {
-    console.log('[ESA] Activating Price History');
-    activatePriceHistory();
-  }
-  
-  if (settings.comparison) {
-    console.log('[ESA] Activating Price Comparison');
-    activateComparison();
-  }
-  
-  if (settings.recommendation) {
-    console.log('[ESA] Activating AI Recommendation');
-    activateRecommendation();
-  }
-  
-  if (settings.reviewChecker) {
-    console.log('[ESA] Activating Review Checker');
-    activateReviewChecker();
+  // Only activate product-specific features on product pages
+  if (isProductPage) {
+    if (settings.priceHistory) {
+      console.log('[ESA] Activating Price History');
+      activatePriceHistory();
+    }
+    
+    if (settings.comparison) {
+      console.log('[ESA] Activating Price Comparison');
+      activateComparison();
+    }
+    
+    if (settings.recommendation) {
+      console.log('[ESA] Activating AI Recommendation');
+      activateRecommendation();
+    }
+    
+    if (settings.reviewChecker) {
+      console.log('[ESA] Activating Review Checker');
+      activateReviewChecker();
+    }
+  } else {
+    console.log('[ESA] Not on product page, skipping product-specific features');
   }
 }
 
@@ -801,68 +810,162 @@ function adjustUIForEmotion(emotion) {
 
 // Feature 2: Focus Mode (Blur Sponsored Items)
 function activateFocusMode() {
-  const style = document.createElement('style');
-  style.id = 'esa-focus-mode';
-  style.textContent = `
-    /* Amazon sponsored items */
-    [data-component-type*="sp-sponsored"],
-    [data-component-type*="sponsored"],
-    .s-sponsored-header,
-    .AdHolder,
-    [data-ad-details],
-    .a-carousel-card[data-a-carousel-options*="sponsored"],
-    div[data-cel-widget*="sp_"],
-    .puis-sponsored-label-text,
-    
-    /* Flipkart sponsored items */
-    [class*="X6gOzU"],
-    [class*="sponsored"],
-    
-    /* Generic sponsored patterns */
-    [class*="ad-"],
-    [class*="advertisement"],
-    [id*="ad-"],
-    [id*="advertisement"],
-    
-    /* Myntra ads */
-    [class*="adBanner"],
-    
-    /* Common ad patterns */
-    div:has(> span:contains("Sponsored")),
-    div:has(> span:contains("Ad")),
-    div:has(> div:contains("Sponsored")) {
-      filter: blur(8px) !important;
-      opacity: 0.3 !important;
-      pointer-events: none !important;
-      transition: all 0.3s ease !important;
-    }
-    
-    [data-component-type*="sp-sponsored"]:hover,
-    [data-component-type*="sponsored"]:hover,
-    [class*="sponsored"]:hover {
-      filter: blur(4px) !important;
-      opacity: 0.6 !important;
-    }
-  `;
-  document.head.appendChild(style);
+  // Helper function to check if element is the main product detail page
+  function isMainProductPage() {
+    return window.location.pathname.includes('/dp/') || 
+           window.location.pathname.includes('/product/') ||
+           document.querySelector('#dp, #detail_page, .product-detail');
+  }
   
-  // Also blur elements with "Sponsored" or "Ad" text
-  setTimeout(() => {
-    const textPatterns = ['Sponsored', 'Ad', 'प्रायोजित', 'विज्ञापन'];
+  // Helper function to check if element contains sponsored indicators
+  function isSponsoredElement(element) {
+    // Check data attributes
+    if (element.hasAttribute('data-component-type')) {
+      const componentType = element.getAttribute('data-component-type');
+      if (componentType.includes('sp-sponsored') || componentType.includes('sponsored-product')) {
+        return true;
+      }
+    }
     
-    document.querySelectorAll('span, div, p').forEach(el => {
-      const text = el.textContent.trim();
-      if (textPatterns.some(pattern => text === pattern || text.startsWith(pattern)) && text.length < 50) {
-        const parent = el.closest('[data-component-type], .s-result-item, .a-carousel-card, [class*="product"], [class*="item"]');
-        if (parent && !parent.hasAttribute('data-esa-blurred')) {
-          parent.style.filter = 'blur(8px)';
-          parent.style.opacity = '0.3';
-          parent.style.pointerEvents = 'none';
-          parent.setAttribute('data-esa-blurred', 'true');
-        }
+    if (element.hasAttribute('data-ad-details') || 
+        element.hasAttribute('data-cel-widget') && element.getAttribute('data-cel-widget').includes('sp_')) {
+      return true;
+    }
+    
+    // Check for sponsored text labels
+    const sponsoredLabels = element.querySelectorAll('.s-sponsored-header, .puis-sponsored-label-text, [class*="sponsored-label"]');
+    if (sponsoredLabels.length > 0) {
+      return true;
+    }
+    
+    // Check for "Sponsored" text in immediate children only (not deep search)
+    const textPatterns = ['Sponsored', 'Ad', 'प्रायोजित', 'विज्ञापन'];
+    const directTextElements = element.querySelectorAll(':scope > span, :scope > div > span, :scope > div > div > span');
+    
+    for (const textEl of directTextElements) {
+      const text = textEl.textContent.trim();
+      if (textPatterns.some(pattern => text === pattern) && text.length < 20) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  // Don't apply blur on main product detail pages
+  if (isMainProductPage()) {
+    // Check if the main product itself is sponsored
+    const mainProduct = document.querySelector('#dp, #detail_page, .product-detail');
+    if (mainProduct && isSponsoredElement(mainProduct)) {
+      // Show notification that main product is sponsored but not blurred
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #ff9900;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        max-width: 300px;
+        animation: slideIn 0.3s ease;
+      `;
+      notification.innerHTML = `
+        <strong>ℹ️ Note:</strong> This is a sponsored product, but we're showing it because it's your main search result.
+      `;
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transition = 'opacity 0.3s ease';
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+      }, 5000);
+    }
+    return; // Don't blur anything on product detail pages
+  }
+  
+  // Apply blur only to confirmed sponsored items in search results
+  setTimeout(() => {
+    // Amazon search results
+    const searchResults = document.querySelectorAll('[data-component-type="s-search-result"], .s-result-item, .a-carousel-card');
+    
+    searchResults.forEach(item => {
+      if (item.hasAttribute('data-esa-checked')) return;
+      item.setAttribute('data-esa-checked', 'true');
+      
+      if (isSponsoredElement(item)) {
+        item.style.filter = 'blur(8px)';
+        item.style.opacity = '0.3';
+        item.style.pointerEvents = 'none';
+        item.style.transition = 'all 0.3s ease';
+        item.setAttribute('data-esa-blurred', 'true');
+        
+        // Add hover effect
+        item.addEventListener('mouseenter', () => {
+          if (item.hasAttribute('data-esa-blurred')) {
+            item.style.filter = 'blur(4px)';
+            item.style.opacity = '0.6';
+          }
+        });
+        
+        item.addEventListener('mouseleave', () => {
+          if (item.hasAttribute('data-esa-blurred')) {
+            item.style.filter = 'blur(8px)';
+            item.style.opacity = '0.3';
+          }
+        });
+      }
+    });
+    
+    // Flipkart search results
+    const flipkartResults = document.querySelectorAll('[class*="_1AtVbE"], [class*="product-base"]');
+    flipkartResults.forEach(item => {
+      if (item.hasAttribute('data-esa-checked')) return;
+      item.setAttribute('data-esa-checked', 'true');
+      
+      if (isSponsoredElement(item)) {
+        item.style.filter = 'blur(8px)';
+        item.style.opacity = '0.3';
+        item.style.pointerEvents = 'none';
+        item.setAttribute('data-esa-blurred', 'true');
+      }
+    });
+    
+    // Explicit ad containers
+    const adContainers = document.querySelectorAll('.AdHolder, [class*="adBanner"], [id*="ad-container"]');
+    adContainers.forEach(ad => {
+      if (!ad.hasAttribute('data-esa-blurred')) {
+        ad.style.filter = 'blur(8px)';
+        ad.style.opacity = '0.3';
+        ad.style.pointerEvents = 'none';
+        ad.setAttribute('data-esa-blurred', 'true');
       }
     });
   }, 1000);
+  
+  // Re-check for dynamically loaded content
+  const observer = new MutationObserver(() => {
+    setTimeout(() => {
+      if (!isMainProductPage()) {
+        const newResults = document.querySelectorAll('[data-component-type="s-search-result"]:not([data-esa-checked]), .s-result-item:not([data-esa-checked])');
+        newResults.forEach(item => {
+          item.setAttribute('data-esa-checked', 'true');
+          if (isSponsoredElement(item)) {
+            item.style.filter = 'blur(8px)';
+            item.style.opacity = '0.3';
+            item.style.pointerEvents = 'none';
+            item.setAttribute('data-esa-blurred', 'true');
+          }
+        });
+      }
+    }, 500);
+  });
+  
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // Feature 3: Price History
@@ -1631,6 +1734,61 @@ function extractProductId() {
   
   // Use URL as fallback ID
   return btoa(url.split('?')[0]).substring(0, 20);
+}
+
+function isOnProductPage() {
+  const url = window.location.href;
+  const hostname = window.location.hostname;
+  
+  // Amazon product page detection
+  if (hostname.includes('amazon')) {
+    // Must have /dp/ or /gp/product/ in URL
+    if (url.match(/\/(dp|gp\/product)\/[A-Z0-9]{10}/)) {
+      return true;
+    }
+    return false;
+  }
+  
+  // Flipkart product page detection
+  if (hostname.includes('flipkart')) {
+    // Must have /p/ in URL
+    if (url.match(/\/p\/[a-zA-Z0-9-]+/)) {
+      return true;
+    }
+    return false;
+  }
+  
+  // Walmart product page detection
+  if (hostname.includes('walmart')) {
+    // Must have /ip/ in URL
+    if (url.match(/\/ip\/[^\/]+\/\d+/)) {
+      return true;
+    }
+    return false;
+  }
+  
+  // eBay product page detection
+  if (hostname.includes('ebay')) {
+    // Must have /itm/ in URL
+    if (url.match(/\/itm\/[^\/]+\/\d+/)) {
+      return true;
+    }
+    return false;
+  }
+  
+  // Generic product page patterns
+  if (url.match(/\/(product|item|dp|p)\/[A-Z0-9]+/i)) {
+    return true;
+  }
+  
+  // Check for common product page indicators in DOM
+  const hasProductTitle = document.querySelector('#productTitle, [data-product-title], .product-title, h1[itemprop="name"]');
+  const hasPrice = document.querySelector('.a-price, [data-price], .price, [itemprop="price"]');
+  const hasBuyButton = document.querySelector('#add-to-cart-button, [data-add-to-cart], .buy-button, button[name="submit.add-to-cart"]');
+  
+  // If we have at least 2 of these indicators, it's likely a product page
+  const indicators = [hasProductTitle, hasPrice, hasBuyButton].filter(Boolean).length;
+  return indicators >= 2;
 }
 
 function extractProductName() {

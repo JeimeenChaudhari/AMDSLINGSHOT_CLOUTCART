@@ -14,14 +14,23 @@ class ProductDetector {
   detectProductPage() {
     const hostname = window.location.hostname;
     
+    console.log('[ProductDetector] Checking page:', hostname);
+    
     if (hostname.includes('amazon')) {
-      return this.detectAmazon();
+      const result = this.detectAmazon();
+      if (result) {
+        console.log('[ProductDetector] ✅ Amazon product detected:', result);
+      } else {
+        console.warn('[ProductDetector] ❌ Not an Amazon product page or extraction failed');
+      }
+      return result;
     } else if (hostname.includes('flipkart')) {
       return this.detectFlipkart();
     } else if (hostname.includes('ebay')) {
       return this.detectEbay();
     }
     
+    console.warn('[ProductDetector] ❌ Unsupported site');
     return null;
   }
 
@@ -51,15 +60,20 @@ class ProductDetector {
       '#productTitle',
       '#title',
       'h1.product-title',
-      '[data-feature-name="title"] h1'
+      '[data-feature-name="title"] h1',
+      'h1 span#productTitle'
     ];
 
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element && element.textContent.trim()) {
-        return element.textContent.trim();
+        const title = element.textContent.trim();
+        console.log(`[ProductDetector] ✅ Title found: ${title.substring(0, 50)}... (selector: ${selector})`);
+        return title;
       }
     }
+    
+    console.warn('[ProductDetector] ❌ Title not found with any selector');
     return null;
   }
 
@@ -69,7 +83,9 @@ class ProductDetector {
       '#priceblock_ourprice',
       '#priceblock_dealprice',
       '.a-price-whole',
-      '[data-a-color="price"] .a-offscreen'
+      '[data-a-color="price"] .a-offscreen',
+      '.priceToPay .a-offscreen',
+      'span.a-price[data-a-size] .a-offscreen'
     ];
 
     for (const selector of selectors) {
@@ -77,9 +93,14 @@ class ProductDetector {
       if (element) {
         const priceText = element.textContent.trim();
         const price = this.parsePrice(priceText);
-        if (price > 0) return price;
+        if (price > 0) {
+          console.log(`[ProductDetector] ✅ Price found: ₹${price} (selector: ${selector})`);
+          return price;
+        }
       }
     }
+    
+    console.warn('[ProductDetector] ❌ Price not found with any selector');
     return null;
   }
 

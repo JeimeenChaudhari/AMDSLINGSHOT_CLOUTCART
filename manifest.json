@@ -83,6 +83,7 @@
         "utils/site-scrapers/walmart-scraper.js",
         "utils/site-scrapers/scraper-factory.js",
         "utils/price-comparison-engine.js",
+        "utils/pipeline-validator.js",
         "utils/comparison.js",
         "utils/price-history-engine.js",
         "utils/price-history-visualizer.js",

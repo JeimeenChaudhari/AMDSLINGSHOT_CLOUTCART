@@ -105,24 +105,31 @@ class PriceComparisonEngine {
 
     for (const [site, fetchResult] of Object.entries(fetchResults)) {
       if (!fetchResult || !fetchResult.success || !fetchResult.html) {
-        console.warn(`[PriceComparison] No HTML for ${site}`);
+        console.warn(`[PriceComparison] ❌ No HTML for ${site}:`, fetchResult?.error || 'Unknown error');
         priceResults[site] = null;
         continue;
       }
 
       const scraper = this.scraperFactory.getScraper(site);
       if (!scraper) {
-        console.warn(`[PriceComparison] No scraper for ${site}`);
+        console.warn(`[PriceComparison] ❌ No scraper registered for ${site}`);
         priceResults[site] = null;
         continue;
       }
 
       try {
+        console.log(`[PriceComparison] Scraping ${site}...`);
         const result = await scraper.scrape(fetchResult.html);
-        priceResults[site] = result;
-        console.log(`[PriceComparison] ${site} result:`, result);
+        
+        if (result && result.price) {
+          console.log(`[PriceComparison] ✅ ${site} result:`, result);
+          priceResults[site] = result;
+        } else {
+          console.warn(`[PriceComparison] ⚠️ ${site} returned no valid data`);
+          priceResults[site] = null;
+        }
       } catch (error) {
-        console.error(`[PriceComparison] Scraping error for ${site}:`, error);
+        console.error(`[PriceComparison] ❌ Scraping error for ${site}:`, error);
         priceResults[site] = null;
       }
     }

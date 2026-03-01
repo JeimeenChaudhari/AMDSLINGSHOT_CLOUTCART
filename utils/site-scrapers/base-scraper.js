@@ -55,7 +55,19 @@ class BaseScraper {
 
   // Validate scraped result
   validateResult(result) {
-    return result && result.price && result.price > 0 && result.title;
+    const isValid = result && result.price && result.price > 0 && result.title && result.title.length > 0;
+    
+    if (!isValid && result) {
+      console.warn('[BaseScraper] Validation failed:', {
+        hasResult: !!result,
+        hasPrice: !!result.price,
+        priceValue: result.price,
+        hasTitle: !!result.title,
+        titleLength: result.title ? result.title.length : 0
+      });
+    }
+    
+    return isValid;
   }
 }
 

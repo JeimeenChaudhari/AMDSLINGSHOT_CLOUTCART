@@ -29,26 +29,40 @@ class FlipkartScraper extends BaseScraper {
   }
 
   async scrape(html) {
+    console.log('[FlipkartScraper] Starting scrape...');
     const doc = this.parseHTML(html);
 
     // Find first product in search results
-    const productContainers = doc.querySelectorAll('._1AtVbE, ._2kHMtA, .tUxRFH');
+    const productContainers = doc.querySelectorAll('._1AtVbE, ._2kHMtA, .tUxRFH, ._13oc-S, .cPHDOP');
+    console.log(`[FlipkartScraper] Found ${productContainers.length} product containers`);
 
     for (const container of productContainers) {
       const result = this.extractProductFromContainer(container);
       if (this.validateResult(result)) {
+        console.log('[FlipkartScraper] ✅ Valid product found:', result);
         return result;
       }
     }
 
     // Fallback: try to extract from entire page
-    return this.extractFromPage(doc);
+    console.log('[FlipkartScraper] No valid container found, trying page-level extraction');
+    const fallbackResult = this.extractFromPage(doc);
+    
+    if (this.validateResult(fallbackResult)) {
+      console.log('[FlipkartScraper] ✅ Fallback extraction successful:', fallbackResult);
+      return fallbackResult;
+    }
+    
+    console.warn('[FlipkartScraper] ❌ No valid product data found');
+    return null;
   }
 
   extractProductFromContainer(container) {
     const title = this.extractFromSelectors(container, this.titleSelectors);
     const priceText = this.extractFromSelectors(container, this.priceSelectors);
     const price = this.parsePrice(priceText);
+
+    console.log(`[FlipkartScraper] Container extraction - Title: ${title ? 'Found' : 'Missing'}, Price: ${price || 'Missing'}`);
 
     let link = null;
     const linkElement = container.querySelector(this.linkSelectors.join(','));
@@ -63,7 +77,7 @@ class FlipkartScraper extends BaseScraper {
       title: title,
       price: price,
       link: link,
-      available: price !== null
+      available: price !== null && price > 0
     };
   }
 
