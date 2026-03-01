@@ -5,7 +5,9 @@
 
 class PriceHistoryAgent {
   constructor() {
-    this.apifyApiKey = 'REMOVED72jxlInBNdnig0mXFaZqDwf3epZ10h2DWdhT';
+    // API key should be stored securely - this is a placeholder
+    // In production, use chrome.storage or environment variables
+    this.apifyApiKey = 'YOUR_APIFY_API_KEY'; // Replace with your key
     
     this.currency = {
       'amazon.in': { symbol: '₹', code: 'INR', locale: 'en-IN' },

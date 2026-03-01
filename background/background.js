@@ -505,8 +505,10 @@ class ActorClient {
 }
 
 // Initialize Apify client
+// API key should be stored securely - this is a placeholder
+// In production, use chrome.storage or environment variables
 const apifyClient = new ApifyClient({
-  token: 'REMOVED72jxlInBNdnig0mXFaZqDwf3epZ10h2DWdhT'
+  token: 'YOUR_APIFY_API_KEY' // Replace with your key
 });
 
 // ============================================================================

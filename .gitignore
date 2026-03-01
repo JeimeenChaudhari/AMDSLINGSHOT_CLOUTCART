@@ -31,6 +31,11 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Configuration files with secrets
+config.js
+secrets.js
+api-keys.js
+
 # Chrome Extension
 *.pem
 *.crx

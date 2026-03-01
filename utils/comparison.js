@@ -2,9 +2,10 @@
 class PriceComparison {
   constructor() {
     // API configuration for RapidAPI
+    // Replace with your actual API key
     this.apiConfig = {
       endpoint: 'https://real-time-product-search.p.rapidapi.com',
-      apiKey: '6915393b67msh53d3dc15a192ddep1fbc58jsnbeeed16e35f8',
+      apiKey: 'YOUR_RAPIDAPI_KEY', // Replace with your key
       apiHost: 'real-time-product-search.p.rapidapi.com',
       enabled: true,
       timeout: 15000 // 15 second timeout for real-time scraping
