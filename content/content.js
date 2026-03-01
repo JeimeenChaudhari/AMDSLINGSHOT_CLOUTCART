@@ -603,19 +603,9 @@ async function updateTrainingStatus() {
     const stats = await emotionDetector.getTrainingStats();
     
     if (stats) {
-      const panel = document.getElementById('esa-panel');
-      if (panel) {
-        const statusDiv = panel.querySelector('.esa-training-status');
-        if (statusDiv) {
-          statusDiv.innerHTML = `
-            <div class="training-info">
-              📊 Samples: ${stats.totalSamples} | 
-              🎯 Accuracy: ${stats.avgConfidence}% | 
-              🔄 Training: ${stats.modelTrainingCount}
-            </div>
-          `;
-        }
-      }
+      // Training stats are now only shown in the extension popup, not in the Smart Assistant panel
+      // This keeps the on-page UI clean for normal consumers
+      console.log('[Content] Training stats:', stats);
     }
   } catch (error) {
     console.error('[Content] Error updating training status:', error);

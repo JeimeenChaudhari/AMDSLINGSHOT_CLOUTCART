@@ -1,4 +1,4 @@
-// Popup controller - Camera access moved to dedicated page
+// Popup controller - Enhanced UI with improved UX
 
 // Load saved settings
 chrome.storage.sync.get([
@@ -13,7 +13,6 @@ chrome.storage.sync.get([
   'productsAnalyzed',
   'cameraPermissionGranted'
 ], (data) => {
-  document.getElementById('emotionToggle').checked = data.emotionEnabled || false;
   document.getElementById('keyboardMode').checked = data.keyboardMode || false;
   document.getElementById('focusModeToggle').checked = data.focusMode !== false;
   document.getElementById('priceHistoryToggle').checked = data.priceHistory !== false;
@@ -21,37 +20,15 @@ chrome.storage.sync.get([
   document.getElementById('recommendationToggle').checked = data.recommendation !== false;
   document.getElementById('reviewCheckerToggle').checked = data.reviewChecker !== false;
   
-  document.getElementById('moneySaved').textContent = `$${data.moneySaved || 0}`;
+  // Update stats
+  document.getElementById('moneySaved').textContent = `₹${data.moneySaved || 0}`;
   document.getElementById('productsAnalyzed').textContent = data.productsAnalyzed || 0;
   
-  // Show camera notice if emotion is enabled but not in keyboard mode
-  if (data.emotionEnabled && !data.keyboardMode && !data.cameraPermissionGranted) {
-    document.getElementById('cameraNotice').style.display = 'block';
+  // Show training stats if keyboard mode is enabled
+  if (data.keyboardMode) {
+    document.getElementById('trainingStats').classList.add('active');
+    updateTrainingStats();
   }
-  
-  updateEmotionStatus();
-});
-
-// Emotion toggle
-document.getElementById('emotionToggle').addEventListener('change', async (e) => {
-  const enabled = e.target.checked;
-  
-  if (enabled) {
-    const keyboardMode = document.getElementById('keyboardMode').checked;
-    if (!keyboardMode) {
-      // Show camera notice with button to open permission page
-      document.getElementById('cameraNotice').style.display = 'block';
-    } else {
-      await chrome.storage.sync.set({ emotionEnabled: enabled });
-      updateEmotionStatus();
-    }
-  } else {
-    document.getElementById('cameraNotice').style.display = 'none';
-    await chrome.storage.sync.set({ emotionEnabled: false });
-    updateEmotionStatus();
-  }
-  
-  notifyContentScript();
 });
 
 // Camera request button
@@ -74,63 +51,108 @@ document.getElementById('requestCameraBtn').addEventListener('click', async () =
   });
   
   // Update UI
-  document.getElementById('emotionToggle').checked = true;
   document.getElementById('keyboardMode').checked = false;
-  document.getElementById('cameraNotice').style.display = 'none';
-  updateEmotionStatus();
+  document.getElementById('trainingStats').classList.remove('active');
   
   // Show success message
   const notice = document.getElementById('cameraNotice');
-  notice.style.display = 'block';
-  notice.style.background = '#e8f5e9';
-  notice.style.color = '#388e3c';
-  notice.innerHTML = '<p style="margin: 0;">✅ Camera mode enabled! Check the shopping page for the camera panel.</p>';
+  notice.innerHTML = `
+    <div class="notice-icon">✅</div>
+    <div class="notice-content">
+      <h3>Camera Mode Enabled!</h3>
+      <p>Check the shopping page for the camera panel. Your browser will request camera permission.</p>
+    </div>
+  `;
+  
+  const card = document.getElementById('emotionCard');
+  card.style.background = 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)';
+  card.style.borderColor = '#81c784';
   
   setTimeout(() => {
-    notice.style.display = 'none';
-  }, 3000);
-});
-
-// Show camera notice when hovering over emotion toggle
-document.getElementById('emotionToggle').parentElement.addEventListener('mouseenter', () => {
-  const emotionEnabled = document.getElementById('emotionToggle').checked;
-  const keyboardMode = document.getElementById('keyboardMode').checked;
-  if (!emotionEnabled && !keyboardMode) {
-    document.getElementById('cameraNotice').style.display = 'block';
-  }
-});
-
-document.getElementById('emotionToggle').parentElement.addEventListener('mouseleave', () => {
-  const emotionEnabled = document.getElementById('emotionToggle').checked;
-  if (!emotionEnabled) {
-    setTimeout(() => {
-      document.getElementById('cameraNotice').style.display = 'none';
-    }, 2000);
-  }
+    location.reload();
+  }, 2500);
 });
 
 // Keyboard mode toggle
 document.getElementById('keyboardMode').addEventListener('change', async (e) => {
   const keyboardMode = e.target.checked;
-  await chrome.storage.sync.set({ keyboardMode });
+  await chrome.storage.sync.set({ 
+    keyboardMode,
+    emotionEnabled: keyboardMode 
+  });
   
   if (keyboardMode) {
-    document.getElementById('cameraNotice').style.display = 'none';
-    if (document.getElementById('emotionToggle').checked) {
-      await chrome.storage.sync.set({ emotionEnabled: true });
-    }
-    
     // Show training stats
-    document.getElementById('trainingStats').style.display = 'block';
+    document.getElementById('trainingStats').classList.add('active');
     updateTrainingStats();
+    
+    // Update camera notice
+    const notice = document.getElementById('cameraNotice');
+    notice.innerHTML = `
+      <div class="notice-icon">⌨️</div>
+      <div class="notice-content">
+        <h3>Keyboard Mode Active</h3>
+        <p>Emotion detection is now analyzing your browsing behavior without camera access.</p>
+      </div>
+    `;
+    
+    const card = document.getElementById('emotionCard');
+    card.style.background = 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)';
+    card.style.borderColor = '#64b5f6';
   } else {
-    document.getElementById('trainingStats').style.display = 'none';
-    if (document.getElementById('emotionToggle').checked) {
-      document.getElementById('cameraNotice').style.display = 'block';
-    }
+    document.getElementById('trainingStats').classList.remove('active');
+    
+    // Reset to default camera notice
+    const notice = document.getElementById('cameraNotice');
+    notice.innerHTML = `
+      <div class="notice-icon">📷</div>
+      <div class="notice-content">
+        <h3>Camera Access Required</h3>
+        <p>When you visit a shopping site, your browser will ask for camera permission. Click "Allow" to enable emotion detection.</p>
+        <p class="notice-subtext">Or click below to grant permission now:</p>
+        <button id="requestCameraBtn" class="btn-primary">
+          <span>🎥</span> Enable Camera Now
+        </button>
+      </div>
+    `;
+    
+    const card = document.getElementById('emotionCard');
+    card.style.background = 'linear-gradient(135deg, #fff9e6 0%, #ffe8cc 100%)';
+    card.style.borderColor = '#ffd699';
+    
+    // Re-attach event listener
+    document.getElementById('requestCameraBtn').addEventListener('click', async () => {
+      await chrome.storage.sync.set({ 
+        emotionEnabled: true,
+        keyboardMode: false 
+      });
+      
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.tabs.sendMessage(tabs[0].id, { action: 'showCamera' });
+        }
+      });
+      
+      document.getElementById('keyboardMode').checked = false;
+      document.getElementById('trainingStats').classList.remove('active');
+      
+      const notice = document.getElementById('cameraNotice');
+      notice.innerHTML = `
+        <div class="notice-icon">✅</div>
+        <div class="notice-content">
+          <h3>Camera Mode Enabled!</h3>
+          <p>Check the shopping page for the camera panel.</p>
+        </div>
+      `;
+      
+      const card = document.getElementById('emotionCard');
+      card.style.background = 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)';
+      card.style.borderColor = '#81c784';
+      
+      setTimeout(() => location.reload(), 2500);
+    });
   }
   
-  updateEmotionStatus();
   notifyContentScript();
 });
 
@@ -142,7 +164,7 @@ async function updateTrainingStats() {
     if (result.trainingStats) {
       const stats = result.trainingStats;
       document.getElementById('trainingSamples').textContent = stats.totalSamples || 0;
-      document.getElementById('modelAccuracy').textContent = stats.avgConfidence || 0;
+      document.getElementById('modelAccuracy').textContent = (stats.avgConfidence || 0) + '%';
       document.getElementById('trainingCount').textContent = stats.lastTrainingSampleCount || 0;
     }
   } catch (error) {
@@ -168,23 +190,12 @@ features.forEach(feature => {
 
 // Reset button
 document.getElementById('resetBtn').addEventListener('click', async () => {
-  await chrome.storage.sync.clear();
-  location.reload();
-});
-
-function updateEmotionStatus() {
-  const enabled = document.getElementById('emotionToggle').checked;
-  const keyboardMode = document.getElementById('keyboardMode').checked;
-  const status = document.getElementById('emotionStatus');
-  
-  if (enabled) {
-    status.textContent = keyboardMode ? 'Keyboard Mode' : 'Camera Mode';
-    status.style.color = '#4caf50';
-  } else {
-    status.textContent = 'Disabled';
-    status.style.color = '#999';
+  if (confirm('Are you sure you want to reset all settings?')) {
+    await chrome.storage.sync.clear();
+    await chrome.storage.local.clear();
+    location.reload();
   }
-}
+});
 
 function notifyContentScript() {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

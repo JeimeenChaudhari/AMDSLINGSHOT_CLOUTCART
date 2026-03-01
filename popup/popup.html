@@ -3,133 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Emotion Shopping Assistant</title>
+  <title>Smart Shopping Assistant</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🛍️ Smart Shopping Assistant</h1>
-      <p class="tagline">AI-Powered Shopping with Emotion Detection</p>
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">🛍️</span>
+          <div class="logo-text">
+            <h1>Smart Shopping Assistant</h1>
+            <p class="tagline">AI-Powered Shopping with Emotion Detection</p>
+          </div>
+        </div>
+      </div>
     </header>
 
     <section class="emotion-section">
-      <h2>😊 Emotion Detection</h2>
-      <div class="toggle-group">
-        <label class="switch">
-          <input type="checkbox" id="emotionToggle">
-          <span class="slider"></span>
-        </label>
-        <span id="emotionStatus">Disabled</span>
+      <div class="section-header">
+        <span class="section-icon">😊</span>
+        <h2>Emotion Detection</h2>
       </div>
       
-      <div class="camera-permission-notice" style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px; display: none;" id="cameraNotice">
-        <strong>📷 Camera Access Required</strong>
-        <p style="margin: 5px 0;">When you visit a shopping site, your browser will ask for camera permission. Click "Allow" to enable emotion detection.</p>
-        <p style="margin: 5px 0; font-size: 11px; color: #666;">Or click below to grant permission now:</p>
-        <button id="requestCameraBtn" style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; margin-top: 5px;">
-          Enable Camera Now
-        </button>
-      </div>
-      
-      <div id="emotionDisplay" class="emotion-display hidden">
-        <video id="webcam" autoplay playsinline></video>
-        <canvas id="emotionCanvas" style="display:none;"></canvas>
-        <div class="emotion-result">
-          <span class="emotion-icon">😐</span>
-          <span class="emotion-text">Neutral</span>
-          <div class="emotion-confidence">Confidence: 0%</div>
+      <div class="emotion-card" id="emotionCard">
+        <div class="camera-permission-notice" id="cameraNotice">
+          <div class="notice-icon">📷</div>
+          <div class="notice-content">
+            <h3>Camera Access Required</h3>
+            <p>When you visit a shopping site, your browser will ask for camera permission. Click "Allow" to enable emotion detection.</p>
+            <p class="notice-subtext">Or click below to grant permission now:</p>
+            <button id="requestCameraBtn" class="btn-primary">
+              <span>🎥</span> Enable Camera Now
+            </button>
+          </div>
         </div>
       </div>
-      <div class="keyboard-mode">
-        <label>
+      
+      <div class="keyboard-mode-card">
+        <label class="checkbox-label">
           <input type="checkbox" id="keyboardMode">
-          Use Keyboard/Cursor Mode (No Webcam)
+          <span class="checkbox-custom"></span>
+          <div class="checkbox-text">
+            <strong>Use Keyboard/Cursor Mode (No Webcam)</strong>
+            <p>Detects emotions from your browsing behavior without camera access</p>
+          </div>
         </label>
-        <p style="font-size: 11px; color: #666; margin: 5px 0 0 20px;">Detects emotions from your browsing behavior without camera access</p>
-        <div id="trainingStats" class="training-stats" style="display: none; margin: 10px 0 0 20px; font-size: 11px; color: #555;">
-          <div>📊 Training Samples: <span id="trainingSamples">0</span></div>
-          <div>🎯 Model Accuracy: <span id="modelAccuracy">0</span>%</div>
-          <div>🔄 Training Count: <span id="trainingCount">0</span></div>
+        <div id="trainingStats" class="training-stats">
+          <div class="stat-row">
+            <span class="stat-icon">📊</span>
+            <span class="stat-label">Training Samples:</span>
+            <span class="stat-value" id="trainingSamples">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-icon">🎯</span>
+            <span class="stat-label">Model Accuracy:</span>
+            <span class="stat-value" id="modelAccuracy">0%</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-icon">🔄</span>
+            <span class="stat-label">Training Count:</span>
+            <span class="stat-value" id="trainingCount">0</span>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="features-section">
-      <h2>⚙️ Features</h2>
+      <div class="section-header">
+        <span class="section-icon">⚙️</span>
+        <h2>Features</h2>
+      </div>
       
-      <div class="feature-item">
-        <label class="switch">
-          <input type="checkbox" id="focusModeToggle" checked>
-          <span class="slider"></span>
-        </label>
-        <div class="feature-info">
-          <strong>Focus Mode</strong>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-header">
+            <span class="feature-icon">🎯</span>
+            <strong>Focus Mode</strong>
+          </div>
           <p>Blur sponsored items</p>
+          <label class="switch">
+            <input type="checkbox" id="focusModeToggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
-      </div>
 
-      <div class="feature-item">
-        <label class="switch">
-          <input type="checkbox" id="priceHistoryToggle" checked>
-          <span class="slider"></span>
-        </label>
-        <div class="feature-info">
-          <strong>Price History</strong>
+        <div class="feature-card">
+          <div class="feature-header">
+            <span class="feature-icon">📈</span>
+            <strong>Price History</strong>
+          </div>
           <p>Track price changes</p>
+          <label class="switch">
+            <input type="checkbox" id="priceHistoryToggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
-      </div>
 
-      <div class="feature-item">
-        <label class="switch">
-          <input type="checkbox" id="comparisonToggle" checked>
-          <span class="slider"></span>
-        </label>
-        <div class="feature-info">
-          <strong>Price Comparison</strong>
+        <div class="feature-card">
+          <div class="feature-header">
+            <span class="feature-icon">💰</span>
+            <strong>Price Comparison</strong>
+          </div>
           <p>Compare across websites</p>
+          <label class="switch">
+            <input type="checkbox" id="comparisonToggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
-      </div>
 
-      <div class="feature-item">
-        <label class="switch">
-          <input type="checkbox" id="recommendationToggle" checked>
-          <span class="slider"></span>
-        </label>
-        <div class="feature-info">
-          <strong>AI Recommendations</strong>
+        <div class="feature-card">
+          <div class="feature-header">
+            <span class="feature-icon">🤖</span>
+            <strong>AI Recommendations</strong>
+          </div>
           <p>Buy or not suggestions</p>
+          <label class="switch">
+            <input type="checkbox" id="recommendationToggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
-      </div>
 
-      <div class="feature-item">
-        <label class="switch">
-          <input type="checkbox" id="reviewCheckerToggle" checked>
-          <span class="slider"></span>
-        </label>
-        <div class="feature-info">
-          <strong>Review Checker</strong>
+        <div class="feature-card">
+          <div class="feature-header">
+            <span class="feature-icon">✅</span>
+            <strong>Review Checker</strong>
+          </div>
           <p>Detect fake reviews</p>
+          <label class="switch">
+            <input type="checkbox" id="reviewCheckerToggle" checked>
+            <span class="slider"></span>
+          </label>
         </div>
       </div>
     </section>
 
     <section class="stats-section">
-      <h2>📊 Session Stats</h2>
+      <div class="section-header">
+        <span class="section-icon">📊</span>
+        <h2>Session Statistics</h2>
+      </div>
       <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value" id="moneySaved">$0</div>
-          <div class="stat-label">Money Saved</div>
+        <div class="stat-card">
+          <div class="stat-icon-wrapper">💵</div>
+          <div class="stat-content">
+            <div class="stat-value" id="moneySaved">₹0</div>
+            <div class="stat-label">Money Saved</div>
+          </div>
         </div>
-        <div class="stat-item">
-          <div class="stat-value" id="productsAnalyzed">0</div>
-          <div class="stat-label">Products Analyzed</div>
+        <div class="stat-card">
+          <div class="stat-icon-wrapper">🔍</div>
+          <div class="stat-content">
+            <div class="stat-value" id="productsAnalyzed">0</div>
+            <div class="stat-label">Products Analyzed</div>
+          </div>
         </div>
       </div>
     </section>
 
     <footer>
-      <button id="resetBtn" class="btn-secondary">Reset Settings</button>
+      <button id="resetBtn" class="btn-secondary">
+        <span>🔄</span> Reset Settings
+      </button>
+      <div class="watermark">
+        <span class="watermark-icon">🚀</span>
+        <span class="watermark-text">Powered by AMD Slingshot Hackathon</span>
+      </div>
     </footer>
   </div>
   <script src="popup.js"></script>

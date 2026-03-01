@@ -1,120 +1,114 @@
-/**
- * Performance Benchmark Utility
- * Measures throughput, latency, and resource usage
- */
+// Performance Benchmark Utility
 
 class PerformanceBenchmark {
   constructor() {
     this.results = [];
   }
-  
-  async measureThroughput(fn, iterations = 1) {
+
+  async measureThroughput(operation) {
     const startTime = Date.now();
     const startMemory = this.getMemoryUsage();
     
-    const result = await fn();
+    const result = await operation();
     
     const endTime = Date.now();
     const endMemory = this.getMemoryUsage();
     
     const duration = endTime - startTime;
-    const throughput = iterations / (duration / 1000);
-    const memoryIncrease = endMemory - startMemory;
+    const memoryUsed = endMemory - startMemory;
     
-    return {
+    let throughput = 0;
+    if (Array.isArray(result)) {
+      throughput = result.length / (duration / 1000);
+    }
+    
+    const benchmark = {
       duration,
+      memoryUsed,
       throughput,
-      memoryIncrease,
-      result
+      timestamp: Date.now()
     };
+    
+    this.results.push(benchmark);
+    
+    return benchmark;
   }
-  
-  async measureLatency(fn, samples = 100) {
+
+  async measureLatency(operation, iterations = 100) {
     const latencies = [];
     
-    for (let i = 0; i < samples; i++) {
+    for (let i = 0; i < iterations; i++) {
       const start = performance.now();
-      await fn();
-      const latency = performance.now() - start;
-      latencies.push(latency);
+      await operation();
+      const end = performance.now();
+      
+      latencies.push(end - start);
     }
     
-    latencies.sort((a, b) => a - b);
-    
     return {
-      min: latencies[0],
-      max: latencies[latencies.length - 1],
-      mean: latencies.reduce((a, b) => a + b) / latencies.length,
-      median: latencies[Math.floor(latencies.length / 2)],
-      p95: latencies[Math.floor(latencies.length * 0.95)],
-      p99: latencies[Math.floor(latencies.length * 0.99)],
-      samples: latencies
+      average: this.average(latencies),
+      median: this.median(latencies),
+      p95: this.percentile(latencies, 95),
+      p99: this.percentile(latencies, 99),
+      min: Math.min(...latencies),
+      max: Math.max(...latencies)
     };
   }
-  
-  async measureConcurrency(fn, concurrency = 10) {
-    const promises = [];
-    const startTime = Date.now();
-    
-    for (let i = 0; i < concurrency; i++) {
-      promises.push(fn());
-    }
-    
-    const results = await Promise.all(promises);
-    const duration = Date.now() - startTime;
-    
-    return {
-      concurrency,
-      duration,
-      throughput: concurrency / (duration / 1000),
-      results
-    };
-  }
-  
+
   getMemoryUsage() {
-    if (typeof process !== 'undefined' && process.memoryUsage) {
-      return process.memoryUsage().heapUsed;
-    }
     if (typeof performance !== 'undefined' && performance.memory) {
       return performance.memory.usedJSHeapSize;
     }
     return 0;
   }
-  
-  recordResult(name, metrics) {
-    this.results.push({
-      name,
-      timestamp: Date.now(),
-      ...metrics
-    });
+
+  average(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
   }
-  
+
+  median(arr) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    
+    if (sorted.length % 2 === 0) {
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    
+    return sorted[mid];
+  }
+
+  percentile(arr, p) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const index = Math.ceil((p / 100) * sorted.length) - 1;
+    return sorted[index];
+  }
+
   getResults() {
     return this.results;
   }
-  
+
+  reset() {
+    this.results = [];
+  }
+
   generateReport() {
-    const report = {
-      totalTests: this.results.length,
-      summary: {},
-      details: this.results
+    if (this.results.length === 0) {
+      return 'No benchmark results available';
+    }
+    
+    const durations = this.results.map(r => r.duration);
+    const throughputs = this.results.map(r => r.throughput);
+    
+    return {
+      totalRuns: this.results.length,
+      averageDuration: this.average(durations),
+      averageThroughput: this.average(throughputs),
+      medianDuration: this.median(durations),
+      p95Duration: this.percentile(durations, 95)
     };
-    
-    // Calculate summary statistics
-    const latencies = this.results.filter(r => r.mean).map(r => r.mean);
-    if (latencies.length > 0) {
-      report.summary.avgLatency = latencies.reduce((a, b) => a + b) / latencies.length;
-      report.summary.maxLatency = Math.max(...latencies);
-      report.summary.minLatency = Math.min(...latencies);
-    }
-    
-    const throughputs = this.results.filter(r => r.throughput).map(r => r.throughput);
-    if (throughputs.length > 0) {
-      report.summary.avgThroughput = throughputs.reduce((a, b) => a + b) / throughputs.length;
-    }
-    
-    return report;
   }
 }
 
-module.exports = PerformanceBenchmark;
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = PerformanceBenchmark;
+}
