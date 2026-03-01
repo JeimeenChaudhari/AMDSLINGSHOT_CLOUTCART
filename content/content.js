@@ -54,10 +54,37 @@ function loadFaceApiScript() {
 // Initialize
 init();
 
+// Cleanup camera on page unload
+window.addEventListener('beforeunload', () => {
+  // Stop any active camera streams
+  const video = document.querySelector('#esa-webcam');
+  if (video && video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+  }
+});
+
+// Cleanup camera on page navigation (for SPAs)
+window.addEventListener('pagehide', () => {
+  const video = document.querySelector('#esa-webcam');
+  if (video && video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+  }
+});
+
 async function init() {
   await loadSettings();
-  injectUI();
-  startFeatures();
+  
+  // Check if extension is enabled
+  const result = await chrome.storage.sync.get(['extensionEnabled']);
+  const extensionEnabled = result.extensionEnabled !== false; // Default to true
+  
+  if (extensionEnabled) {
+    injectUI();
+    startFeatures();
+  } else {
+    console.log('[Content] Extension is disabled, skipping initialization');
+  }
+  
   setupListeners();
 }
 
@@ -252,6 +279,13 @@ function injectUI() {
         }
       });
       
+      // Save camera permission granted state
+      await chrome.storage.sync.set({ 
+        cameraPermissionGranted: true,
+        emotionEnabled: true,
+        keyboardMode: false
+      });
+      
       video.srcObject = cameraStream;
       
       video.onloadedmetadata = () => {
@@ -284,6 +318,8 @@ function injectUI() {
       
       if (error.name === 'NotAllowedError') {
         cameraStatus.textContent = '❌ Camera permission denied. Please allow camera access.';
+        // Clear the permission granted flag if user denies
+        chrome.storage.sync.set({ cameraPermissionGranted: false });
       } else if (error.name === 'NotFoundError') {
         cameraStatus.textContent = '❌ No camera found on your device.';
       } else {
@@ -311,6 +347,11 @@ function injectUI() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // Clear the camera permission granted flag when user manually stops camera
+    chrome.storage.sync.set({ 
+      cameraPermissionGranted: false 
+    });
+    
     cameraContainer.style.display = 'none';
     cameraStatus.style.display = 'block';
     cameraStatus.textContent = 'Camera stopped. Click "Start Camera" to resume.';
@@ -318,6 +359,8 @@ function injectUI() {
     
     startCameraBtn.textContent = '📷 Start Camera';
     startCameraBtn.disabled = false;
+    
+    console.log('[Camera] Camera stopped and permission flag cleared');
   }
   
   async function detectCameraEmotion() {
@@ -445,10 +488,36 @@ function injectUI() {
     }
   }
   
-  // Check if camera mode is enabled
-  chrome.storage.sync.get(['emotionEnabled', 'keyboardMode'], (data) => {
-    if (data.emotionEnabled && !data.keyboardMode) {
-      cameraSection.style.display = 'block';
+  // Check if camera mode is enabled and auto-start if permission was granted
+  function updateCameraSectionVisibility() {
+    chrome.storage.sync.get(['emotionEnabled', 'keyboardMode', 'cameraPermissionGranted'], (data) => {
+      if (data.emotionEnabled && !data.keyboardMode) {
+        cameraSection.style.display = 'block';
+        
+        // Auto-start camera if permission was previously granted
+        if (data.cameraPermissionGranted && !cameraStream) {
+          console.log('[Camera] Auto-starting camera (permission previously granted)');
+          setTimeout(() => {
+            startCamera();
+          }, 1000); // Small delay to ensure UI is ready
+        }
+      } else {
+        // Only hide if explicitly disabled, not on initial load
+        if (data.emotionEnabled === false || data.keyboardMode === true) {
+          cameraSection.style.display = 'none';
+          stopCamera();
+        }
+      }
+    });
+  }
+  
+  // Initial check
+  updateCameraSectionVisibility();
+  
+  // Listen for storage changes to update camera section visibility
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync' && (changes.emotionEnabled || changes.keyboardMode)) {
+      updateCameraSectionVisibility();
     }
   });
 
@@ -960,61 +1029,248 @@ function activateFocusMode() {
 
 // Feature 3: Price History
 function activatePriceHistory() {
+  console.log('[PriceHistory] Activating AI-powered price history feature...');
+  
+  // Check if AI agent is available
+  if (typeof window.PriceHistoryAgent !== 'undefined') {
+    console.log('[PriceHistory] Using AI Price History Agent');
+    activateAIPriceHistory();
+    return;
+  }
+  
+  // Check if the new implementation is available
+  if (typeof window.initializePriceHistory === 'function') {
+    console.log('[PriceHistory] Using new price history integration');
+    window.initializePriceHistory();
+    return;
+  }
+  
+  // Fallback to basic implementation
   const productId = extractProductId();
-  if (!productId) return;
+  if (!productId) {
+    console.log('[PriceHistory] Could not extract product ID');
+    return;
+  }
   
   // Get price history from storage
   chrome.storage.local.get(['priceHistory'], (data) => {
     const history = data.priceHistory || {};
     const currentPrice = extractCurrentPrice();
     
-    if (currentPrice) {
-      // Store current price
-      if (!history[productId]) {
-        history[productId] = [];
-      }
+    if (!currentPrice) {
+      console.log('[PriceHistory] Could not extract current price');
+      return;
+    }
+    
+    console.log('[PriceHistory] Current price:', currentPrice);
+    
+    // Store current price
+    if (!history[productId]) {
+      history[productId] = [];
+    }
+    
+    // Check if we already have a price entry for today
+    const today = new Date().toDateString();
+    const hasToday = history[productId].some(entry => {
+      return new Date(entry.date).toDateString() === today;
+    });
+    
+    if (!hasToday) {
       history[productId].push({
         price: currentPrice,
         date: new Date().toISOString()
       });
-      
-      // Keep only last 30 days
-      history[productId] = history[productId].filter(entry => {
-        const entryDate = new Date(entry.date);
-        const daysDiff = (Date.now() - entryDate.getTime()) / (1000 * 60 * 60 * 24);
-        return daysDiff <= 30;
-      });
-      
-      chrome.storage.local.set({ priceHistory: history });
-      
-      // Display price history
-      displayPriceHistory(history[productId]);
+      console.log('[PriceHistory] Saved new price entry');
     }
+    
+    // Keep only last 30 days
+    history[productId] = history[productId].filter(entry => {
+      const entryDate = new Date(entry.date);
+      const daysDiff = (Date.now() - entryDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysDiff <= 30;
+    });
+    
+    chrome.storage.local.set({ priceHistory: history });
+    
+    // Always display price history widget (even with 1 entry)
+    displayPriceHistory(history[productId], currentPrice);
   });
 }
 
-function displayPriceHistory(history) {
-  if (!history || history.length < 2) return;
-  
+// AI-Powered Price History
+async function activateAIPriceHistory() {
+  const currentPrice = extractCurrentPrice();
+  if (!currentPrice) {
+    console.log('[PriceHistory] Could not extract current price');
+    return;
+  }
+
+  const agent = new PriceHistoryAgent();
+  const url = window.location.href;
+
+  // Show loading widget
+  const loadingWidget = document.createElement('div');
+  loadingWidget.className = 'esa-price-history';
+  loadingWidget.id = 'esa-price-history-widget';
+  loadingWidget.innerHTML = `
+    <h3>📊 Price History</h3>
+    <div class="esa-checker-loading">Fetching real price data...</div>
+  `;
+
+  insertPriceWidget(loadingWidget);
+
+  try {
+    // Get price history from agent
+    const analysis = await agent.getPriceHistory(url, currentPrice);
+
+    if (!analysis.hasData) {
+      loadingWidget.innerHTML = `
+        <h3>📊 Price History</h3>
+        <div class="esa-info">
+          <p>${analysis.message}</p>
+          <p style="font-size: 12px; margin-top: 8px;">We'll start tracking prices from your first visit.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Format prices with currency
+    const formatPrice = (price) => agent.formatPrice(price, analysis.currencyInfo);
+
+    // Determine trend icon and color
+    let trendIcon = '🟡';
+    let trendText = 'Average Price';
+    let trendColor = '#ed8936';
+
+    if (analysis.recommendation === 'best') {
+      trendIcon = '🟢';
+      trendText = 'Best Price Ever!';
+      trendColor = '#48bb78';
+    } else if (analysis.recommendation === 'good') {
+      trendIcon = '🟢';
+      trendText = 'Good Deal';
+      trendColor = '#48bb78';
+    } else if (analysis.trend === 'increasing') {
+      trendIcon = '🔴';
+      trendText = 'Price Increasing';
+      trendColor = '#f56565';
+    }
+
+    loadingWidget.innerHTML = `
+      <h3>📊 Price History (${analysis.dataPoints} data points)</h3>
+      <div class="esa-price-stats">
+        <div>
+          <div style="font-size: 10px; color: #666;">Lowest</div>
+          <div style="font-weight: 700; color: #48bb78;">${formatPrice(analysis.prices.lowest)}</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: #666;">Current</div>
+          <div style="font-weight: 700; color: #333;">${formatPrice(analysis.prices.current)}</div>
+        </div>
+        <div>
+          <div style="font-size: 10px; color: #666;">Highest</div>
+          <div style="font-weight: 700; color: #f56565;">${formatPrice(analysis.prices.highest)}</div>
+        </div>
+      </div>
+      <div class="esa-price-trend" style="background: ${trendColor}15; color: ${trendColor}; border: 2px solid ${trendColor};">
+        ${trendIcon} ${trendText}
+      </div>
+      ${analysis.savings.amount > 0 ? `
+        <div style="text-align: center; margin-top: 8px; padding: 8px; background: #f0fff4; border-radius: 6px;">
+          <div style="font-size: 12px; color: #48bb78; font-weight: 600;">
+            💰 You save ${formatPrice(analysis.savings.amount)} (${analysis.savings.percent}%) from highest price
+          </div>
+        </div>
+      ` : ''}
+      <div style="font-size: 11px; color: #666; margin-top: 8px; text-align: center;">
+        Tracking since ${new Date(analysis.dateRange.from).toLocaleDateString()}
+      </div>
+    `;
+
+    console.log('[PriceHistory] ✅ AI analysis complete:', analysis);
+
+  } catch (error) {
+    console.error('[PriceHistory] AI agent error:', error);
+    loadingWidget.innerHTML = `
+      <h3>📊 Price History</h3>
+      <div class="esa-info">
+        <p>Unable to fetch price history at this time.</p>
+        <p style="font-size: 12px; margin-top: 8px;">We'll track prices locally from your visits.</p>
+      </div>
+    `;
+  }
+}
+
+function insertPriceWidget(widget) {
+  const priceSelectors = [
+    '.a-price',
+    '.price',
+    '[data-price]',
+    '._30jeq3',
+    '.pdp-price',
+    '.prod-sp',
+    '.actual-price',
+    '.selling-price',
+    '.product-price',
+    '.pdpPrice',
+    '#corePriceDisplay_desktop_feature_div'
+  ];
+
+  let priceElement = null;
+  for (const selector of priceSelectors) {
+    priceElement = document.querySelector(selector);
+    if (priceElement) {
+      console.log('[PriceHistory] Found price element with selector:', selector);
+      break;
+    }
+  }
+
+  if (priceElement) {
+    priceElement.parentElement.insertBefore(widget, priceElement.nextSibling);
+    console.log('[PriceHistory] ✅ Widget inserted');
+  } else {
+    console.log('[PriceHistory] Could not find price element');
+  }
+}
+
+function displayPriceHistory(history, currentPrice) {
+  if (!history || history.length === 0) {
+    console.log('[PriceHistory] No history to display');
+    return;
+  }
+
   const prices = history.map(h => h.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
-  const currentPrice = prices[prices.length - 1];
-  
+  const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const latestPrice = currentPrice || prices[prices.length - 1];
+
+  let trend = '🟡 Average Price';
+  if (latestPrice === minPrice) {
+    trend = '🟢 Best Price!';
+  } else if (latestPrice === maxPrice) {
+    trend = '🔴 Highest Price';
+  } else if (latestPrice < avgPrice) {
+    trend = '🟢 Below Average';
+  } else if (latestPrice > avgPrice) {
+    trend = '🔴 Above Average';
+  }
+
   const priceWidget = document.createElement('div');
   priceWidget.className = 'esa-price-history';
   priceWidget.innerHTML = `
-    <h3>📊 Price History (Last ${history.length} checks)</h3>
+    <h3>📊 Price History (${history.length} ${history.length === 1 ? 'check' : 'checks'})</h3>
     <div class="esa-price-stats">
-      <div>Lowest: $${minPrice.toFixed(2)}</div>
-      <div>Highest: $${maxPrice.toFixed(2)}</div>
-      <div>Current: $${currentPrice.toFixed(2)}</div>
+      <div>Lowest: ₹${minPrice.toFixed(2)}</div>
+      <div>Highest: ₹${maxPrice.toFixed(2)}</div>
+      <div>Current: ₹${latestPrice.toFixed(2)}</div>
     </div>
-    <div class="esa-price-trend">
-      ${currentPrice === minPrice ? '🟢 Best Price!' : currentPrice === maxPrice ? '🔴 Highest Price' : '🟡 Average Price'}
-    </div>
+    <div class="esa-price-trend">${trend}</div>
+    ${history.length === 1 ? '<p style="font-size: 12px; color: #666; margin-top: 8px; text-align: center;">Visit this page again to track price changes over time</p>' : ''}
   `;
-  
+
+  console.log('[PriceHistory] Widget created, looking for insertion point...');
+
   const priceSelectors = [
     '.a-price',
     '.price',
@@ -1027,17 +1283,24 @@ function displayPriceHistory(history) {
     '.product-price',
     '.pdpPrice'
   ];
-  
+
   let priceElement = null;
   for (const selector of priceSelectors) {
     priceElement = document.querySelector(selector);
-    if (priceElement) break;
+    if (priceElement) {
+      console.log('[PriceHistory] Found price element with selector:', selector);
+      break;
+    }
   }
-  
+
   if (priceElement) {
     priceElement.parentElement.insertBefore(priceWidget, priceElement.nextSibling);
+    console.log('[PriceHistory] ✅ Widget inserted successfully');
+  } else {
+    console.log('[PriceHistory] Could not find price element for widget placement');
   }
 }
+
 
 // Feature 4: Price Comparison
 function activateComparison() {
@@ -1576,6 +1839,16 @@ function extractReviews() {
 
 // Feature 6: Review Checker
 function activateReviewChecker() {
+  console.log('[ReviewChecker] Activating AI-powered review analysis...');
+  
+  // Check if AI agent is available
+  if (typeof window.ReviewAnalysisAgent !== 'undefined') {
+    console.log('[ReviewChecker] Using AI Review Analysis Agent');
+    activateAIReviewChecker();
+    return;
+  }
+  
+  // Fallback to basic implementation
   const reviewSelectors = [
     '[data-hook="review"]',             // Amazon
     '.review',                          // Generic
@@ -1591,10 +1864,17 @@ function activateReviewChecker() {
   let reviews = [];
   for (const selector of reviewSelectors) {
     reviews = document.querySelectorAll(selector);
-    if (reviews.length > 0) break;
+    if (reviews.length > 0) {
+      console.log('[ReviewChecker] Found', reviews.length, 'reviews with selector:', selector);
+      break;
+    }
   }
   
-  if (reviews.length === 0) return;
+  // Check if there are actually any reviews
+  if (reviews.length === 0) {
+    console.log('[ReviewChecker] No reviews found on this page');
+    return;
+  }
   
   const checkerWidget = document.createElement('div');
   checkerWidget.className = 'esa-review-checker';
@@ -1603,34 +1883,30 @@ function activateReviewChecker() {
     <div class="esa-checker-loading">Analyzing ${reviews.length} reviews...</div>
   `;
   
-  const reviewSectionSelectors = [
-    '#reviewsMedley',
-    '#reviews',
-    '.reviews-section',
-    '[data-hook="reviews-medley"]',
-    '.review-section',
-    '[class*="review"]'
-  ];
-  
-  let reviewSection = null;
-  for (const selector of reviewSectionSelectors) {
-    reviewSection = document.querySelector(selector);
-    if (reviewSection) break;
-  }
-  
-  if (reviewSection) {
-    reviewSection.insertBefore(checkerWidget, reviewSection.firstChild);
-  } else if (reviews.length > 0) {
-    reviews[0].parentElement.insertBefore(checkerWidget, reviews[0]);
-  }
+  insertReviewWidget(checkerWidget);
   
   // Analyze reviews
   setTimeout(() => {
     const analysis = analyzeReviews(reviews);
     
+    // Only show widget if we have actual data
+    if (analysis.totalReviews === 0) {
+      checkerWidget.innerHTML = `
+        <h3>🔍 Review Analysis</h3>
+        <div class="esa-info">
+          <p>No customer reviews available yet for this product.</p>
+        </div>
+      `;
+      return;
+    }
+    
     checkerWidget.innerHTML = `
       <h3>🔍 Review Analysis</h3>
       <div class="esa-checker-results">
+        <div class="esa-checker-stat">
+          <span class="label">Total Reviews Analyzed:</span>
+          <span class="value">${analysis.totalReviews}</span>
+        </div>
         <div class="esa-checker-stat">
           <span class="label">Authenticity Score:</span>
           <span class="value ${analysis.score > 70 ? 'good' : analysis.score > 40 ? 'medium' : 'bad'}">
@@ -1639,64 +1915,250 @@ function activateReviewChecker() {
         </div>
         <div class="esa-checker-stat">
           <span class="label">Suspicious Reviews:</span>
-          <span class="value">${analysis.suspicious}</span>
+          <span class="value ${analysis.suspicious === 0 ? 'good' : analysis.suspicious < 5 ? 'medium' : 'bad'}">${analysis.suspicious}</span>
         </div>
         <div class="esa-checker-stat">
           <span class="label">Verified Purchases:</span>
-          <span class="value">${analysis.verified}%</span>
+          <span class="value ${analysis.verified > 70 ? 'good' : analysis.verified > 40 ? 'medium' : 'bad'}">${analysis.verified}%</span>
         </div>
-        <div class="esa-checker-warnings">
-          ${analysis.warnings.map(w => `<div class="warning">⚠️ ${w}</div>`).join('')}
-        </div>
+        ${analysis.warnings.length > 0 ? `
+          <div class="esa-checker-warnings">
+            ${analysis.warnings.map(w => `<div class="warning">⚠️ ${w}</div>`).join('')}
+          </div>
+        ` : '<div class="esa-info" style="margin-top: 12px; color: #48bb78;">✅ Reviews look authentic and trustworthy</div>'}
       </div>
     `;
     
+    // Mark suspicious reviews if any
+    if (analysis.suspiciousIndices && analysis.suspiciousIndices.length > 0) {
+      analysis.suspiciousIndices.forEach(index => {
+        if (reviews[index]) {
+          const badge = document.createElement('span');
+          badge.className = 'esa-suspicious-badge';
+          badge.textContent = '⚠️ Suspicious';
+          badge.title = 'This review shows patterns of fake reviews';
+          reviews[index].style.position = 'relative';
+          reviews[index].appendChild(badge);
+        }
+      });
+    }
+  }, 1000);
+}
+
+// AI-Powered Review Checker
+function activateAIReviewChecker() {
+  const agent = new ReviewAnalysisAgent();
+  
+  const checkerWidget = document.createElement('div');
+  checkerWidget.className = 'esa-review-checker';
+  checkerWidget.id = 'esa-review-checker-widget';
+  checkerWidget.innerHTML = `
+    <h3>🔍 Review Analysis</h3>
+    <div class="esa-checker-loading">AI analyzing reviews...</div>
+  `;
+  
+  insertReviewWidget(checkerWidget);
+  
+  setTimeout(() => {
+    const analysis = agent.analyzeReviews();
+    
+    if (!analysis.hasReviews) {
+      checkerWidget.innerHTML = `
+        <h3>🔍 Review Analysis</h3>
+        <div class="esa-info">
+          <p>${analysis.message}</p>
+        </div>
+      `;
+      return;
+    }
+
+    console.log('[ReviewChecker] AI Analysis:', analysis);
+
+    // Create rating distribution chart
+    const ratingBars = Object.entries(analysis.ratingDistribution)
+      .reverse()
+      .map(([rating, count]) => {
+        const percent = (count / analysis.totalReviews * 100).toFixed(1);
+        return `
+          <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
+            <span style="font-size: 11px; width: 30px;">${rating} ⭐</span>
+            <div style="flex: 1; background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div style="width: ${percent}%; background: ${rating >= 4 ? '#48bb78' : rating >= 3 ? '#ed8936' : '#f56565'}; height: 100%;"></div>
+            </div>
+            <span style="font-size: 11px; width: 40px; text-align: right;">${count}</span>
+          </div>
+        `;
+      }).join('');
+
+    checkerWidget.innerHTML = `
+      <h3>🔍 AI Review Analysis</h3>
+      <div class="esa-checker-results">
+        <div class="esa-checker-stat">
+          <span class="label">Total Reviews:</span>
+          <span class="value">${analysis.totalReviews}</span>
+        </div>
+        <div class="esa-checker-stat">
+          <span class="label">Authenticity Score:</span>
+          <span class="value ${analysis.authenticityScore > 70 ? 'good' : analysis.authenticityScore > 40 ? 'medium' : 'bad'}">
+            ${analysis.authenticityScore}%
+          </span>
+        </div>
+        <div class="esa-checker-stat">
+          <span class="label">Average Rating:</span>
+          <span class="value">${analysis.avgRating} ⭐</span>
+        </div>
+        <div class="esa-checker-stat">
+          <span class="label">Verified Purchases:</span>
+          <span class="value ${analysis.verified > 70 ? 'good' : analysis.verified > 40 ? 'medium' : 'bad'}">
+            ${analysis.verifiedCount} (${analysis.verified}%)
+          </span>
+        </div>
+        <div class="esa-checker-stat">
+          <span class="label">Suspicious Reviews:</span>
+          <span class="value ${analysis.suspicious === 0 ? 'good' : analysis.suspicious < 5 ? 'medium' : 'bad'}">
+            ${analysis.suspicious}
+          </span>
+        </div>
+        
+        <div style="margin-top: 12px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+          <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #333;">Rating Distribution</div>
+          ${ratingBars}
+        </div>
+        
+        ${analysis.warnings.length > 0 ? `
+          <div class="esa-checker-warnings">
+            ${analysis.warnings.map(w => `<div class="warning">⚠️ ${w}</div>`).join('')}
+          </div>
+        ` : '<div class="esa-info" style="margin-top: 12px; color: #48bb78;">✅ Reviews appear authentic and trustworthy</div>'}
+      </div>
+    `;
+
     // Mark suspicious reviews
-    reviews.forEach((review, index) => {
-      if (Math.random() < 0.15) { // 15% chance of being flagged
-        const badge = document.createElement('span');
-        badge.className = 'esa-suspicious-badge';
-        badge.textContent = '⚠️ Suspicious';
-        badge.title = 'This review shows patterns of fake reviews';
-        review.style.position = 'relative';
-        review.insertBefore(badge, review.firstChild);
-      }
-    });
-  }, 2000);
+    if (analysis.suspiciousIndices && analysis.suspiciousIndices.length > 0) {
+      const reviewElements = agent.extractReviews();
+      analysis.suspiciousIndices.forEach(index => {
+        if (reviewElements[index]) {
+          const badge = document.createElement('span');
+          badge.className = 'esa-suspicious-badge';
+          badge.textContent = '⚠️ Suspicious';
+          badge.title = 'This review shows patterns of fake content';
+          reviewElements[index].style.position = 'relative';
+          reviewElements[index].appendChild(badge);
+        }
+      });
+    }
+  }, 1000);
+}
+
+function insertReviewWidget(widget) {
+  const reviewSectionSelectors = [
+    '#reviewsMedley',
+    '#reviews',
+    '.reviews-section',
+    '[data-hook="reviews-medley"]',
+    '.review-section',
+    '[class*="review"]',
+    '#cm-cr-dp-review-list'
+  ];
+  
+  let reviewSection = null;
+  for (const selector of reviewSectionSelectors) {
+    reviewSection = document.querySelector(selector);
+    if (reviewSection) {
+      console.log('[ReviewChecker] Found review section with selector:', selector);
+      break;
+    }
+  }
+  
+  if (reviewSection) {
+    reviewSection.insertBefore(widget, reviewSection.firstChild);
+    console.log('[ReviewChecker] ✅ Widget inserted');
+  } else {
+    console.log('[ReviewChecker] Could not find review section');
+  }
 }
 
 function analyzeReviews(reviews) {
+  if (!reviews || reviews.length === 0) {
+    return {
+      totalReviews: 0,
+      score: 0,
+      suspicious: 0,
+      verified: 0,
+      warnings: [],
+      suspiciousIndices: []
+    };
+  }
+  
   let suspicious = 0;
   let verified = 0;
   const warnings = [];
+  const suspiciousIndices = [];
   
-  reviews.forEach(review => {
+  reviews.forEach((review, index) => {
     const text = review.textContent.toLowerCase();
     
     // Check for verified purchase
-    if (text.includes('verified purchase')) {
+    if (text.includes('verified purchase') || text.includes('verified buyer')) {
       verified++;
     }
     
     // Detect suspicious patterns
-    if (text.length < 50) suspicious++;
-    if (text.includes('amazing') && text.includes('perfect') && text.includes('best')) suspicious++;
-    if (/(.)\1{4,}/.test(text)) suspicious++; // Repeated characters
+    let suspicionScore = 0;
+    
+    // Very short reviews (less than 30 chars)
+    if (text.length < 30) suspicionScore++;
+    
+    // Too many superlatives
+    const superlatives = ['amazing', 'perfect', 'best', 'excellent', 'outstanding', 'fantastic'];
+    const superlativeCount = superlatives.filter(word => text.includes(word)).length;
+    if (superlativeCount >= 3) suspicionScore++;
+    
+    // Repeated characters (spam pattern)
+    if (/(.)\1{4,}/.test(text)) suspicionScore++;
+    
+    // Generic phrases
+    const genericPhrases = ['highly recommend', 'must buy', 'value for money', 'worth buying'];
+    const genericCount = genericPhrases.filter(phrase => text.includes(phrase)).length;
+    if (genericCount >= 2 && text.length < 100) suspicionScore++;
+    
+    // Mark as suspicious if score is high
+    if (suspicionScore >= 2) {
+      suspicious++;
+      suspiciousIndices.push(index);
+    }
   });
   
   const verifiedPercent = Math.round((verified / reviews.length) * 100);
   const suspiciousPercent = Math.round((suspicious / reviews.length) * 100);
-  const score = Math.max(0, 100 - suspiciousPercent * 2);
   
-  if (suspiciousPercent > 20) warnings.push('High number of suspicious reviews detected');
-  if (verifiedPercent < 50) warnings.push('Many unverified purchases');
-  if (score < 60) warnings.push('Overall authenticity is questionable');
+  // Calculate authenticity score
+  let score = 100;
+  score -= suspiciousPercent * 1.5; // Reduce by suspicious percentage
+  score -= Math.max(0, (50 - verifiedPercent) * 0.5); // Reduce if low verified purchases
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  
+  // Generate warnings
+  if (suspiciousPercent > 20) {
+    warnings.push('High number of suspicious reviews detected');
+  }
+  if (verifiedPercent < 40) {
+    warnings.push('Many unverified purchases');
+  }
+  if (score < 60) {
+    warnings.push('Overall authenticity is questionable');
+  }
+  if (suspicious > 10) {
+    warnings.push(`${suspicious} reviews show patterns of fake content`);
+  }
   
   return {
+    totalReviews: reviews.length,
     score,
     suspicious,
     verified: verifiedPercent,
-    warnings
+    warnings,
+    suspiciousIndices
   };
 }
 
@@ -1830,9 +2292,32 @@ function extractProductName() {
 }
 
 function extractCurrentPrice() {
+  // Priority selectors for main product price (Amazon India specific)
+  const prioritySelectors = [
+    '.a-price[data-a-size="xl"] .a-offscreen',  // Amazon main price
+    '.a-price[data-a-size="large"] .a-offscreen', // Amazon large price
+    '#priceblock_ourprice',                     // Amazon our price
+    '#priceblock_dealprice',                    // Amazon deal price
+    '.a-price.apexPriceToPay .a-offscreen',     // Amazon apex price
+    'span.a-price-whole',                       // Amazon price whole
+  ];
+
+  // Try priority selectors first
+  for (const selector of prioritySelectors) {
+    const el = document.querySelector(selector);
+    if (el) {
+      const priceText = el.textContent || el.getAttribute('content') || '';
+      const cleanPrice = priceText.replace(/[^0-9.]/g, '');
+      const price = parseFloat(cleanPrice);
+      if (price && price > 0 && price < 10000000) {
+        console.log('[PriceExtract] Found price with priority selector:', selector, '=', price);
+        return price;
+      }
+    }
+  }
+
+  // Standard selectors
   const selectors = [
-    '.a-price-whole',                  // Amazon
-    '.a-price .a-offscreen',           // Amazon
     '[data-price]',                    // Generic
     '.price',                          // Generic
     '._30jeq3',                        // Flipkart
@@ -1849,8 +2334,6 @@ function extractCurrentPrice() {
     '[data-testid*="price"]',          // Test IDs
     'meta[property="og:price:amount"]',// Open Graph
     'meta[property="product:price:amount"]', // Product meta
-    'span[class*="price"]',            // Span with price
-    'div[class*="price"]'              // Div with price
   ];
   
   for (const selector of selectors) {
@@ -1859,32 +2342,33 @@ function extractCurrentPrice() {
       const priceText = el.textContent || el.getAttribute('content') || el.getAttribute('data-price') || '';
       const cleanPrice = priceText.replace(/[^0-9.]/g, '');
       const price = parseFloat(cleanPrice);
-      if (price && price > 0 && price < 10000000) { // Sanity check
-        return price;
-      }
-    }
-  }
-  
-  // Fallback: search for price patterns in the entire page
-  const bodyText = document.body.textContent;
-  const pricePatterns = [
-    /₹\s*([0-9,]+(?:\.[0-9]{2})?)/,
-    /Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-    /INR\s*([0-9,]+(?:\.[0-9]{2})?)/i,
-    /\$\s*([0-9,]+(?:\.[0-9]{2})?)/
-  ];
-  
-  for (const pattern of pricePatterns) {
-    const match = bodyText.match(pattern);
-    if (match) {
-      const cleanPrice = match[1].replace(/,/g, '');
-      const price = parseFloat(cleanPrice);
       if (price && price > 0 && price < 10000000) {
+        console.log('[PriceExtract] Found price with selector:', selector, '=', price);
         return price;
       }
     }
   }
   
+  // Fallback: search for price patterns near "Price:" text
+  const priceLabels = document.querySelectorAll('span, div, td');
+  for (const label of priceLabels) {
+    const text = label.textContent.trim();
+    if (text.match(/^Price:/i)) {
+      // Look for price in next sibling or parent
+      const parent = label.parentElement;
+      const priceMatch = parent.textContent.match(/₹\s*([0-9,]+(?:\.[0-9]{2})?)/);
+      if (priceMatch) {
+        const cleanPrice = priceMatch[1].replace(/,/g, '');
+        const price = parseFloat(cleanPrice);
+        if (price && price > 0 && price < 10000000) {
+          console.log('[PriceExtract] Found price near "Price:" label =', price);
+          return price;
+        }
+      }
+    }
+  }
+  
+  console.log('[PriceExtract] Could not extract price');
   return null;
 }
 
@@ -1950,15 +2434,39 @@ function setupListeners() {
       location.reload();
     }
     
+    if (message.action === 'updateSettings') {
+      // Update settings without reloading
+      if (message.settings) {
+        Object.assign(settings, message.settings);
+        
+        // Hide camera section if switching away from camera mode
+        if (message.settings.keyboardMode === false && message.settings.emotionEnabled === false) {
+          const cameraSection = document.querySelector('.esa-camera-section');
+          if (cameraSection) {
+            cameraSection.style.display = 'none';
+          }
+        }
+      }
+    }
+    
     if (message.action === 'showCamera') {
       // Show camera section in panel
       const cameraSection = document.querySelector('.esa-camera-section');
       if (cameraSection) {
         cameraSection.style.display = 'block';
+        
+        // Ensure settings are correct in storage
+        chrome.storage.sync.set({ 
+          emotionEnabled: true,
+          keyboardMode: false 
+        });
+        
         // Scroll panel into view
         const panel = document.getElementById('esa-panel');
         if (panel) {
           panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          // Expand panel if minimized
+          panel.classList.remove('minimized');
         }
       }
     }
@@ -1970,7 +2478,99 @@ function setupListeners() {
         emotionDetector.modelTrainer.scheduleTraining();
       }
     }
+    
+    if (message.action === 'extensionToggled') {
+      handleExtensionToggle(message.enabled);
+    }
   });
+  
+  // Listen for storage changes to maintain camera state across navigation
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+      if (changes.cameraPermissionGranted) {
+        console.log('[Content] Camera permission state changed:', changes.cameraPermissionGranted.newValue);
+      }
+      
+      // Update settings object
+      if (changes.emotionEnabled) {
+        settings.emotionEnabled = changes.emotionEnabled.newValue;
+      }
+      if (changes.keyboardMode) {
+        settings.keyboardMode = changes.keyboardMode.newValue;
+      }
+    }
+  });
+}
+
+// Handle extension toggle
+function handleExtensionToggle(enabled) {
+  if (enabled) {
+    // Re-enable extension features
+    console.log('[Content] Extension activated');
+    
+    // Show the panel
+    const panel = document.getElementById('esa-panel');
+    if (panel) {
+      panel.style.display = 'block';
+    }
+    
+    // Reinitialize features based on settings
+    chrome.storage.sync.get([
+      'focusMode',
+      'priceHistory',
+      'comparison',
+      'recommendation',
+      'reviewChecker',
+      'emotionEnabled',
+      'keyboardMode'
+    ], (data) => {
+      settings = {
+        emotionEnabled: data.emotionEnabled || false,
+        keyboardMode: data.keyboardMode || false,
+        focusMode: data.focusMode !== false,
+        priceHistory: data.priceHistory !== false,
+        comparison: data.comparison !== false,
+        recommendation: data.recommendation !== false,
+        reviewChecker: data.reviewChecker !== false
+      };
+      
+      // Restart features
+      startFeatures();
+    });
+  } else {
+    // Disable extension features
+    console.log('[Content] Extension deactivated');
+    
+    // Hide the panel
+    const panel = document.getElementById('esa-panel');
+    if (panel) {
+      panel.style.display = 'none';
+    }
+    
+    // Stop emotion detection
+    if (window.emotionDetectionInterval) {
+      clearInterval(window.emotionDetectionInterval);
+    }
+    
+    // Stop camera if active
+    const video = document.querySelector('#esa-webcam');
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
+    // Remove all extension-added elements
+    const extensionElements = document.querySelectorAll(
+      '.esa-price-history, .esa-comparison, .esa-recommendation, .esa-review-analysis, .esa-focus-blur'
+    );
+    extensionElements.forEach(el => el.remove());
+    
+    // Remove focus mode blur
+    const blurredElements = document.querySelectorAll('[style*="filter: blur"]');
+    blurredElements.forEach(el => {
+      el.style.filter = '';
+      el.style.opacity = '';
+    });
+  }
 }
 
 // Update stats

@@ -308,11 +308,31 @@ CloutCart follows **Edge AI principles** aligned with AMD's AI ecosystem:
 
 ### Enable Features
 
+- **Extension Toggle**: Master ON/OFF switch in the popup header
+  - When OFF: All extension features are disabled
+  - When ON: Extension operates normally with individual feature controls
 - **Emotion Detection**: Toggle ON in extension popup
   - Choose Camera Mode or Keyboard/Cursor Mode
 - **Price Comparison**: Toggle ON for multi-site price checking
 - **Review Analysis**: Automatically enabled on product pages
 - **Price History**: Tracks prices across sessions
+- **Focus Mode**: Blur sponsored items for distraction-free browsing
+
+### Extension Toggle Feature
+
+The extension now includes a prominent toggle button at the top of the popup that allows you to:
+
+- **Quickly enable/disable** all extension functionality with one click
+- **Preserve your settings** when disabled - all feature preferences are saved
+- **Clean deactivation** - when turned off, the extension:
+  - Hides all UI overlays and panels
+  - Stops emotion detection (camera and behavioral)
+  - Removes price comparison widgets
+  - Clears focus mode blur effects
+  - Stops all background processing
+- **Instant reactivation** - when turned back on, all features resume based on your saved preferences
+
+This is useful when you want to temporarily disable the extension without uninstalling it, or when browsing non-shopping sites.
 
 ---
 

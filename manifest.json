@@ -64,6 +64,8 @@
         "*://*.indiamart.com/*"
       ],
       "js": [
+        "agents/price-history-agent.js",
+        "agents/review-analysis-agent.js",
         "models/simple-emotion-detector.js",
         "models/behavioral-data-collector.js",
         "models/feature-extractor.js",
